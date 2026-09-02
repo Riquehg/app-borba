@@ -12,7 +12,7 @@ const clientConfig = {
   categories: ["Todos", "Hambúrgueres", "Porções", "Bebidas"]
 };
 
-// Tabela de Bairros & Taxas de Entrega (Exemplo para Itajaí)
+// Tabela de Bairros & Taxas de Entrega
 const neighborhoods = [
   { name: "Cordeiros", fee: 5.00 },
   { name: "São Vicente", fee: 7.00 },
@@ -80,7 +80,7 @@ export default function Home() {
   const [selectedNeighborhood, setSelectedNeighborhood] = useState(neighborhoods[0]);
   const [customer, setCustomer] = useState({ name: '', address: '', payment: 'PIX', notes: '' });
 
-  // Estado para o Modal do Montador de Lanche
+  // Modal de Personalização
   const [activeModalProduct, setActiveModalProduct] = useState(null);
   const [selectedMeatPoint, setSelectedMeatPoint] = useState("");
   const [selectedAddons, setSelectedAddons] = useState([]);
@@ -90,10 +90,9 @@ export default function Home() {
     ? products 
     : products.filter(item => item.category === selectedCategory);
 
-  // Abrir Modal de Customização do Lanche
   const openCustomizer = (product) => {
     if (!product.hasOptions) {
-      addToCart({ ...product, cartId: Date.now(), finalPrice: product.price, details: "" });
+      setCart([...cart, { ...product, cartId: Date.now(), finalPrice: product.price, details: "" }]);
       return;
     }
     setActiveModalProduct(product);
@@ -102,7 +101,6 @@ export default function Home() {
     setRemovedIngredients([]);
   };
 
-  // Toggle para Adicionais
   const toggleAddon = (addon) => {
     if (selectedAddons.find(a => a.name === addon.name)) {
       setSelectedAddons(selectedAddons.filter(a => a.name !== addon.name));
@@ -111,7 +109,6 @@ export default function Home() {
     }
   };
 
-  // Toggle para Remoções
   const toggleRemoved = (ing) => {
     if (removedIngredients.includes(ing)) {
       setRemovedIngredients(removedIngredients.filter(i => i !== ing));
@@ -120,7 +117,6 @@ export default function Home() {
     }
   };
 
-  // Confirmar Lanche Personalizado no Carrinho
   const confirmCustomProduct = () => {
     const addonsTotal = selectedAddons.reduce((sum, item) => sum + item.price, 0);
     const finalPrice = activeModalProduct.price + addonsTotal;
@@ -151,6 +147,11 @@ export default function Home() {
 
   const calculateTotal = () => {
     return (calculateSubtotal() + selectedNeighborhood.fee).toFixed(2);
+  };
+
+  const scrollToCheckout = () => {
+    const el = document.getElementById("checkout-section");
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
   };
 
   const sendOrderToWhatsApp = () => {
@@ -185,7 +186,7 @@ ${itemsSummary}
   };
 
   return (
-    <div style={{ backgroundColor: clientConfig.backgroundColor, color: clientConfig.textColor }} className="min-h-screen max-w-md mx-auto font-sans pb-12">
+    <div style={{ backgroundColor: clientConfig.backgroundColor, color: clientConfig.textColor }} className="min-h-screen max-w-md mx-auto font-sans pb-24">
       
       {/* Banner & Header */}
       <div className="relative">
@@ -257,7 +258,7 @@ ${itemsSummary}
 
             {/* Opção 1: Ponto da Carne */}
             <div className="mb-4">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-orange-400 mb-2">Ponto da Carne (Obrigatório)</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-orange-400 mb-2">Ponto da Carne</h4>
               <div className="space-y-1.5">
                 {activeModalProduct.optionGroups[0].options.map((pt) => (
                   <label key={pt} className="flex items-center space-x-2 bg-gray-800 p-2.5 rounded-lg text-xs cursor-pointer">
@@ -320,23 +321,27 @@ ${itemsSummary}
         </div>
       )}
 
-      {/* CARRINHO E CHECKOUT */}
+      {/* ÁREA DO CARRINHO E CHECKOUT */}
       {cart.length > 0 && (
-        <div className="m-4 bg-gray-900 p-4 rounded-xl border border-gray-700 shadow-xl">
+        <div id="checkout-section" className="m-4 mt-8 bg-gray-900 p-4 rounded-xl border border-gray-700 shadow-xl">
           <h3 className="font-bold text-md mb-3 border-b border-gray-800 pb-2 flex justify-between">
-            <span>🛒 Carrinho</span>
-            <span className="text-xs text-gray-400">{cart.length} itens</span>
+            <span>🛒 Seu Carrinho</span>
+            <span className="text-xs text-gray-400">{cart.length} {cart.length === 1 ? 'item' : 'itens'}</span>
           </h3>
           
           <div className="space-y-3 mb-4">
             {cart.map((cItem) => (
-              <div key={cItem.cartId} className="flex justify-between items-start text-xs text-gray-300 bg-gray-800 p-2 rounded-lg">
+              <div key={cItem.cartId} className="flex justify-between items-start text-xs text-gray-300 bg-gray-800 p-2.5 rounded-lg">
                 <div className="pr-2">
                   <div className="font-bold text-white">{cItem.name}</div>
                   {cItem.details && <div className="text-[11px] text-gray-400 mt-0.5">{cItem.details}</div>}
                   <div className="text-orange-400 font-bold mt-1">R$ {cItem.finalPrice.toFixed(2)}</div>
                 </div>
-                <button onClick={() => removeFromCart(cItem.cartId)} className="text-red-400 font-bold p-1">✕</button>
+                <button 
+                  onClick={() => removeFromCart(cItem.cartId)} 
+                  className="text-red-400 font-bold text-sm p-1 bg-gray-700/50 hover:bg-red-500/20 rounded">
+                  ✕
+                </button>
               </div>
             ))}
           </div>
@@ -393,12 +398,30 @@ ${itemsSummary}
 
           <button 
             onClick={sendOrderToWhatsApp}
-            className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-sm transition flex items-center justify-center space-x-2">
+            className="w-full py-3.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-sm transition flex items-center justify-center space-x-2">
             <span>Enviar Pedido pelo WhatsApp</span>
             <span>🚀</span>
           </button>
         </div>
       )}
+
+      {/* BARRA FLUTUANTE DO CARRINHO (RODAPÉ FIXO) */}
+      {cart.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 p-3 max-w-md mx-auto">
+          <button 
+            onClick={scrollToCheckout}
+            className="w-full bg-green-600 hover:bg-green-700 text-white font-bold p-3.5 rounded-xl shadow-2xl flex justify-between items-center transition border border-green-500/30">
+            <div className="flex items-center space-x-2">
+              <span className="bg-black/30 text-xs px-2.5 py-1 rounded-full">{cart.length}</span>
+              <span className="text-xs uppercase tracking-wider">Ver Carrinho</span>
+            </div>
+            <div className="text-sm font-bold">
+              R$ {calculateTotal()} ➔
+            </div>
+          </button>
+        </div>
+      )}
+
     </div>
   );
 }
