@@ -5,8 +5,8 @@ const defaultTenant = {
   name: "Borba Cordeiros",
   whatsapp: "5547999999999",
   primary_color: "#FF8C00",
-  logo_url: "https://images.unsplash.com/photo-1550547660-d9450f859349?w=150&auto=format&fit=crop&q=80",
-  banner_url: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80"
+  logo_url: "https://storage.googleapis.com/prod-cardapio-web/uploads/company/logo/34208/8587d992WhatsApp_Image_2026-06-05_at_10.32.49.jpeg",
+  banner_url: "https://storage.googleapis.com/prod-cardapio-web/uploads/company/image/34208/54f8b26fWhatsApp_Image_2026-06-05_at_10.27.33.jpeg"
 };
 
 export default function Home() {
