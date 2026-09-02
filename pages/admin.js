@@ -13,9 +13,10 @@ export default function Admin() {
   const [tenant, setTenant] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Forms
+  // States dos formulários
   const [newProd, setNewProd] = useState({ name: '', price: '', category_id: '', description: '', image: '', addons_list: '' });
   const [editingProduct, setEditingProduct] = useState(null);
+  const [editingAddon, setEditingAddon] = useState(null);
   const [newCatName, setNewCatName] = useState('');
   const [newAddon, setNewAddon] = useState({ name: '', price: '' });
   const [newNeigh, setNewNeigh] = useState({ name: '', fee: '' });
@@ -61,7 +62,7 @@ export default function Admin() {
     setLoading(false);
   };
 
-  // CADASTRAR PRODUTO
+  // PRODUTOS
   const handleAddProduct = async (e) => {
     e.preventDefault();
     if (!newProd.name || !newProd.price) return alert("Preencha nome e preço!");
@@ -93,7 +94,6 @@ export default function Admin() {
     }
   };
 
-  // ATUALIZAR PRODUTO (SALVAR EDIÇÃO)
   const handleUpdateProduct = async (e) => {
     e.preventDefault();
     if (!editingProduct.name || !editingProduct.price) return alert("Preencha nome e preço!");
@@ -111,7 +111,7 @@ export default function Admin() {
     }).eq('id', editingProduct.id);
 
     if (error) {
-      alert("Erro ao atualizar produto: " + error.message);
+      alert("Erro ao atualizar: " + error.message);
     } else {
       setEditingProduct(null);
       fetchData();
@@ -156,10 +156,10 @@ export default function Admin() {
   // ADICIONAIS GLOBAIS
   const handleAddGlobalAddon = async (e) => {
     e.preventDefault();
-    if (!newAddon.name || newAddon.price === '') return alert("Preencha nome e preço do adicional!");
+    if (!newAddon.name || newAddon.price === '') return alert("Preencha nome e preço!");
 
     const formattedPrice = parseFloat(String(newAddon.price).replace(',', '.'));
-    if (isNaN(formattedPrice)) return alert("Preço do adicional inválido!");
+    if (isNaN(formattedPrice)) return alert("Preço inválido!");
 
     const { error } = await supabase.from('global_addons').insert([{
       tenant_id: 1, name: newAddon.name.trim(), price: formattedPrice
@@ -174,6 +174,25 @@ export default function Admin() {
     }
   };
 
+  const handleUpdateAddon = async (e) => {
+    e.preventDefault();
+    const formattedPrice = parseFloat(String(editingAddon.price).replace(',', '.'));
+    if (isNaN(formattedPrice)) return alert("Preço inválido!");
+
+    const { error } = await supabase.from('global_addons').update({
+      name: editingAddon.name,
+      price: formattedPrice
+    }).eq('id', editingAddon.id);
+
+    if (error) {
+      alert("Erro ao atualizar: " + error.message);
+    } else {
+      setEditingAddon(null);
+      fetchData();
+      alert("Adicional atualizado!");
+    }
+  };
+
   const deleteGlobalAddon = async (id) => {
     if (confirm("Excluir este adicional?")) {
       await supabase.from('global_addons').delete().eq('id', id);
@@ -185,7 +204,7 @@ export default function Admin() {
   const handleAddNeighborhood = async (e) => {
     e.preventDefault();
     if (!newNeigh.name || newNeigh.fee === '') return alert("Preencha bairro e taxa!");
-    
+
     const formattedFee = parseFloat(String(newNeigh.fee).replace(',', '.'));
 
     await supabase.from('neighborhoods').insert([{
@@ -234,7 +253,7 @@ export default function Admin() {
         </button>
       </header>
 
-      {/* ABAS */}
+      {/* NAVEGAÇÃO DE ABAS */}
       <div className="flex space-x-1 bg-gray-900 p-1 rounded-xl border border-gray-800 mb-6 text-[11px] font-bold overflow-x-auto">
         <button onClick={() => setActiveTab('products')} className={`flex-1 py-2 px-2 rounded-lg whitespace-nowrap ${activeTab === 'products' ? 'bg-orange-500 text-white' : 'text-gray-400'}`}>
           🍔 Itens
@@ -250,7 +269,7 @@ export default function Admin() {
         </button>
       </div>
 
-      {/* PRODUTOS */}
+      {/* ABA 1: PRODUTOS */}
       {activeTab === 'products' && (
         <div className="space-y-6">
           <section className="bg-gray-900 p-4 rounded-xl border border-gray-800 space-y-3">
@@ -321,7 +340,7 @@ export default function Admin() {
             </form>
           </section>
 
-          {/* LISTA */}
+          {/* LISTA DE LANCHES */}
           <section className="space-y-2">
             <h3 className="font-bold text-sm text-gray-300">📋 Produtos ({products.length})</h3>
             {products.map((item) => (
@@ -354,7 +373,7 @@ export default function Admin() {
         </div>
       )}
 
-      {/* MODAL DE EDIÇÃO COM SELEÇÃO DE ADICIONAIS */}
+      {/* MODAL EDITAR LANCHE */}
       {editingProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 w-full max-w-md rounded-2xl p-5 border border-gray-700 max-h-[90vh] overflow-y-auto space-y-3">
@@ -410,7 +429,6 @@ export default function Admin() {
                 />
               </div>
 
-              {/* SELEÇÃO DE ADICIONAIS DENTRO DA EDIÇÃO */}
               {globalAddons.length > 0 && (
                 <div className="border-t border-gray-800 pt-2">
                   <label className="text-[11px] text-gray-400 block mb-1">Gerenciar Adicionais deste Lanche:</label>
@@ -454,7 +472,7 @@ export default function Admin() {
         </div>
       )}
 
-      {/* CATEGORIAS */}
+      {/* ABA 2: CATEGORIAS */}
       {activeTab === 'categories' && (
         <div className="space-y-6">
           <section className="bg-gray-900 p-4 rounded-xl border border-gray-800 space-y-3">
@@ -481,7 +499,7 @@ export default function Admin() {
         </div>
       )}
 
-      {/* ADICIONAIS GLOBAIS */}
+      {/* ABA 3: ADICIONAIS GLOBAIS COM BOTOES EDITAR E DELETAR */}
       {activeTab === 'addons' && (
         <div className="space-y-6">
           <section className="bg-gray-900 p-4 rounded-xl border border-gray-800 space-y-3">
@@ -511,14 +529,62 @@ export default function Admin() {
                   <span className="font-bold block text-white">{a.name}</span>
                   <span className="text-orange-400 font-bold">+ R$ {Number(a.price).toFixed(2)}</span>
                 </div>
-                <button onClick={() => deleteGlobalAddon(a.id)} className="text-red-400 font-bold p-1">🗑</button>
+                <div className="flex items-center space-x-1.5">
+                  <button 
+                    onClick={() => setEditingAddon(a)}
+                    className="text-xs bg-blue-600/20 text-blue-400 p-1.5 rounded-lg font-bold">
+                    ✏️ Editar
+                  </button>
+                  <button onClick={() => deleteGlobalAddon(a.id)} className="text-red-400 font-bold p-1">🗑</button>
+                </div>
               </div>
             ))}
           </section>
         </div>
       )}
 
-      {/* BAIRROS */}
+      {/* MODAL EDITAR ADICIONAL */}
+      {editingAddon && (
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 w-full max-w-sm rounded-2xl p-5 border border-gray-700 space-y-3">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="font-bold text-sm text-orange-400">✏️ Editar Adicional</h3>
+              <button onClick={() => setEditingAddon(null)} className="text-gray-400 font-bold text-sm">✕</button>
+            </div>
+
+            <form onSubmit={handleUpdateAddon} className="space-y-3">
+              <div>
+                <label className="text-[11px] text-gray-400 block mb-1">Nome:</label>
+                <input 
+                  type="text" value={editingAddon.name}
+                  className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
+                  onChange={(e) => setEditingAddon({ ...editingAddon, name: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] text-gray-400 block mb-1">Valor R$:</label>
+                <input 
+                  type="text" value={editingAddon.price}
+                  className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
+                  onChange={(e) => setEditingAddon({ ...editingAddon, price: e.target.value })}
+                />
+              </div>
+
+              <div className="flex space-x-2 pt-2">
+                <button type="button" onClick={() => setEditingAddon(null)} className="w-1/2 bg-gray-800 py-2.5 rounded-lg text-xs font-bold text-gray-300">
+                  Cancelar
+                </button>
+                <button type="submit" className="w-1/2 bg-green-600 py-2.5 rounded-lg text-xs font-bold text-white">
+                  Salvar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ABA 4: BAIRROS */}
       {activeTab === 'neighborhoods' && (
         <div className="space-y-6">
           <section className="bg-gray-900 p-4 rounded-xl border border-gray-800 space-y-3">
