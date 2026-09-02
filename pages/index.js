@@ -26,31 +26,39 @@ export default function Home() {
     async function loadData() {
       try {
         const { data: tData } = await supabase.from('tenants').select('*').eq('id', 1).single();
-        const { data: pData } = await supabase.from('products').select('*').eq('tenant_id', 1).eq('active', true);
-        const { data: cData } = await supabase.from('categories').select('*').eq('tenant_id', 1);
+        const { data: cData } = await supabase.from('categories').select('*').eq('tenant_id', 1).order('id', { ascending: true });
+        const { data: pData } = await supabase.from('products').select('*').eq('tenant_id', 1).eq('active', true).order('category_id', { ascending: true });
 
         if (tData) setTenant(tData);
-        if (pData && pData.length > 0) setProducts(pData);
         if (cData && cData.length > 0) setCategories([{ id: 'all', name: 'Todos' }, ...cData]);
+        if (pData && pData.length > 0) setProducts(pData);
       } catch (e) {
-        console.log("Erro de carregamento");
+        console.log("Erro de conexão");
       }
     }
     loadData();
   }, []);
 
+  // Filtro por Categoria
+  const filteredProducts = selectedCategory === "Todos"
+    ? products
+    : products.filter(p => {
+        const catObj = categories.find(c => c.name === selectedCategory);
+        return catObj ? p.category_id === catObj.id : true;
+      });
+
   const openProductModal = (product) => {
-    if (!product.addons_list && !product.removals_list) {
-      setCart([...cart, { ...product, cartId: Date.now(), finalPrice: Number(product.price), details: "" }]);
-      return;
-    }
     setActiveModalProduct(product);
     setSelectedAddons([]);
     setRemovedIngredients([]);
   };
 
   const parseAddons = (str) => {
-    if (!str) return [];
+    if (!str) return [
+      { name: 'Bacon Extra', price: 4.50 },
+      { name: 'Cheddar Extra', price: 3.50 },
+      { name: 'Hambúrguer Extra 160g', price: 8.00 }
+    ];
     return str.split(',').map(item => {
       const [name, price] = item.split(':');
       return { name: name?.trim(), price: parseFloat(price) || 0 };
@@ -58,7 +66,7 @@ export default function Home() {
   };
 
   const parseRemovals = (str) => {
-    if (!str) return [];
+    if (!str) return ['Sem Cebola', 'Sem Tomate', 'Sem Maionese'];
     return str.split(',').map(item => item.trim());
   };
 
@@ -159,7 +167,7 @@ ${itemsSummary}
 
       {/* Lista de Produtos */}
       <div className="px-4 space-y-4">
-        {products.map((item) => (
+        {filteredProducts.map((item) => (
           <div key={item.id} className="bg-gray-900 p-3 rounded-xl flex space-x-3 items-center border border-gray-800">
             <img src={item.image} alt={item.name} className="w-20 h-20 rounded-lg object-cover flex-shrink-0" />
             <div className="flex-1">
@@ -188,51 +196,47 @@ ${itemsSummary}
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h3 className="font-bold text-lg">{activeModalProduct.name}</h3>
-                <p className="text-xs text-gray-400">Monte seu lanche abaixo</p>
+                <p className="text-xs text-gray-400">Personalize seu lanche abaixo</p>
               </div>
               <button onClick={() => setActiveModalProduct(null)} className="text-gray-400 font-bold text-lg">✕</button>
             </div>
 
             {/* Adicionais */}
-            {activeModalProduct.addons_list && (
-              <div className="mb-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-orange-400 mb-2">Deseja Adicionais?</h4>
-                <div className="space-y-1.5">
-                  {parseAddons(activeModalProduct.addons_list).map((add) => (
-                    <label key={add.name} className="flex justify-between items-center bg-gray-800 p-2.5 rounded-lg text-xs cursor-pointer">
-                      <div className="flex items-center space-x-2">
-                        <input 
-                          type="checkbox" 
-                          checked={!!selectedAddons.find(a => a.name === add.name)}
-                          onChange={() => toggleAddon(add)}
-                        />
-                        <span>{add.name}</span>
-                      </div>
-                      <span className="text-orange-400 font-bold">+ R$ {add.price.toFixed(2)}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Remoções */}
-            {activeModalProduct.removals_list && (
-              <div className="mb-6">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-orange-400 mb-2">Retirar Ingredientes</h4>
-                <div className="grid grid-cols-2 gap-2">
-                  {parseRemovals(activeModalProduct.removals_list).map((ing) => (
-                    <label key={ing} className="flex items-center space-x-2 bg-gray-800 p-2.5 rounded-lg text-xs cursor-pointer">
+            <div className="mb-4">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-orange-400 mb-2">Deseja Adicionais?</h4>
+              <div className="space-y-1.5">
+                {parseAddons(activeModalProduct.addons_list).map((add) => (
+                  <label key={add.name} className="flex justify-between items-center bg-gray-800 p-2.5 rounded-lg text-xs cursor-pointer">
+                    <div className="flex items-center space-x-2">
                       <input 
                         type="checkbox" 
-                        checked={removedIngredients.includes(ing)}
-                        onChange={() => toggleRemoval(ing)}
+                        checked={!!selectedAddons.find(a => a.name === add.name)}
+                        onChange={() => toggleAddon(add)}
                       />
-                      <span>{ing}</span>
-                    </label>
-                  ))}
-                </div>
+                      <span>{add.name}</span>
+                    </div>
+                    <span className="text-orange-400 font-bold">+ R$ {add.price.toFixed(2)}</span>
+                  </label>
+                ))}
               </div>
-            )}
+            </div>
+
+            {/* Remoções */}
+            <div className="mb-6">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-orange-400 mb-2">Retirar Ingredientes</h4>
+              <div className="grid grid-cols-2 gap-2">
+                {parseRemovals(activeModalProduct.removals_list).map((ing) => (
+                  <label key={ing} className="flex items-center space-x-2 bg-gray-800 p-2.5 rounded-lg text-xs cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={removedIngredients.includes(ing)}
+                      onChange={() => toggleRemoval(ing)}
+                    />
+                    <span>{ing}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
 
             <button 
               onClick={confirmCustomProduct}
