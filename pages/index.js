@@ -13,9 +13,12 @@ export default function Home() {
   const [tenant, setTenant] = useState(defaultTenant);
   const [categories, setCategories] = useState([{ id: 'all', name: 'Todos' }]);
   const [products, setProducts] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState("Todos");
+  const [neighborhoods, setNeighborhoods] = useState([]);
+  
+  const [selectedCategoryId, setSelectedCategoryId] = useState("all");
   const [cart, setCart] = useState([]);
-  const [customer, setCustomer] = useState({ name: '', address: '', payment: 'PIX' });
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState(null);
+  const [customer, setCustomer] = useState({ name: '', address: '', payment: 'PIX', notes: '' });
 
   // Modal State
   const [activeModalProduct, setActiveModalProduct] = useState(null);
@@ -28,24 +31,26 @@ export default function Home() {
         const { data: tData } = await supabase.from('tenants').select('*').eq('id', 1).single();
         const { data: cData } = await supabase.from('categories').select('*').eq('tenant_id', 1).order('id', { ascending: true });
         const { data: pData } = await supabase.from('products').select('*').eq('tenant_id', 1).eq('active', true).order('category_id', { ascending: true });
+        const { data: nData } = await supabase.from('neighborhoods').select('*').eq('tenant_id', 1).order('id', { ascending: true });
 
         if (tData) setTenant(tData);
         if (cData && cData.length > 0) setCategories([{ id: 'all', name: 'Todos' }, ...cData]);
         if (pData && pData.length > 0) setProducts(pData);
+        if (nData && nData.length > 0) {
+          setNeighborhoods(nData);
+          setSelectedNeighborhood(nData[0]);
+        }
       } catch (e) {
-        console.log("Erro de conexão");
+        console.log("Erro ao carregar do banco");
       }
     }
     loadData();
   }, []);
 
-  // Filtro por Categoria
-  const filteredProducts = selectedCategory === "Todos"
+  // FILTRO CORRIGIDO POR ID DA CATEGORIA
+  const filteredProducts = selectedCategoryId === "all"
     ? products
-    : products.filter(p => {
-        const catObj = categories.find(c => c.name === selectedCategory);
-        return catObj ? p.category_id === catObj.id : true;
-      });
+    : products.filter(p => p.category_id === selectedCategoryId);
 
   const openProductModal = (product) => {
     setActiveModalProduct(product);
@@ -108,7 +113,8 @@ export default function Home() {
     setCart(cart.filter(item => item.cartId !== cartId));
   };
 
-  const calculateTotal = () => cart.reduce((sum, item) => sum + item.finalPrice, 0).toFixed(2);
+  const calculateSubtotal = () => cart.reduce((sum, item) => sum + item.finalPrice, 0);
+  const calculateTotal = () => (calculateSubtotal() + (selectedNeighborhood?.fee || 0)).toFixed(2);
 
   const sendOrderToWhatsApp = () => {
     if (cart.length === 0) return alert("Seu carrinho está vazio!");
@@ -124,15 +130,18 @@ export default function Home() {
 `*NOVO PEDIDO - ${tenant.name.toUpperCase()}* 🍔
 ----------------------------------
 *Cliente:* ${customer.name}
-*Endereço:* ${customer.address}
+*Endereço:* ${customer.address} (${selectedNeighborhood?.name || 'Entrega'})
 *Pagamento:* ${customer.payment}
 
 *ITENS DO PEDIDO:*
 ${itemsSummary}
 
 ----------------------------------
+*Subtotal:* R$ ${calculateSubtotal().toFixed(2)}
+*Taxa (${selectedNeighborhood?.name}):* R$ ${Number(selectedNeighborhood?.fee || 0).toFixed(2)}
 *TOTAL DO PEDIDO:* R$ ${calculateTotal()}
-----------------------------------`;
+----------------------------------
+*Obs:* ${customer.notes || 'Nenhuma'}`;
 
     window.open(`https://wa.me/${tenant.whatsapp}?text=${encodeURIComponent(message)}`, '_blank');
   };
@@ -152,20 +161,20 @@ ${itemsSummary}
         <p className="text-xs text-gray-400 mt-1">Lanches & Petiscos • Entrega Rápida</p>
       </header>
 
-      {/* Categorias */}
-      <div className="flex space-x-2 overflow-x-auto p-4">
+      {/* BANNER DE CATEGORIAS (FILTRO FUNCIONAL) */}
+      <div className="flex space-x-2 overflow-x-auto p-4 scrollbar-hide">
         {categories.map((cat) => (
           <button
             key={cat.id}
-            onClick={() => setSelectedCategory(cat.name)}
-            style={{ backgroundColor: selectedCategory === cat.name ? tenant.primary_color : '#1F2937' }}
-            className="px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap text-white">
+            onClick={() => setSelectedCategoryId(cat.id)}
+            style={{ backgroundColor: selectedCategoryId === cat.id ? tenant.primary_color : '#1F2937' }}
+            className="px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap text-white transition">
             {cat.name}
           </button>
         ))}
       </div>
 
-      {/* Lista de Produtos */}
+      {/* LISTA DE PRODUTOS */}
       <div className="px-4 space-y-4">
         {filteredProducts.map((item) => (
           <div key={item.id} className="bg-gray-900 p-3 rounded-xl flex space-x-3 items-center border border-gray-800">
@@ -248,38 +257,82 @@ ${itemsSummary}
         </div>
       )}
 
-      {/* Carrinho */}
+      {/* ÁREA DO CARRINHO E CHECKOUT */}
       {cart.length > 0 && (
-        <div className="m-4 mt-8 bg-gray-900 p-4 rounded-xl border border-gray-700 shadow-xl">
-          <h3 className="font-bold text-md mb-3 border-b border-gray-800 pb-2 flex justify-between">
+        <div className="m-4 mt-8 bg-gray-900 p-4 rounded-xl border border-gray-700 shadow-xl space-y-3">
+          <h3 className="font-bold text-md border-b border-gray-800 pb-2 flex justify-between">
             <span>🛒 Seu Carrinho</span>
             <span className="text-xs text-gray-400">{cart.length} itens</span>
           </h3>
-          <div className="space-y-2 mb-4">
+
+          <div className="space-y-2 mb-2">
             {cart.map((c) => (
-              <div key={c.cartId} className="flex justify-between text-xs bg-gray-800 p-2.5 rounded">
+              <div key={c.cartId} className="flex justify-between text-xs bg-gray-800 p-2.5 rounded-lg">
                 <div>
                   <div className="font-bold">{c.name}</div>
                   {c.details && <div className="text-[11px] text-gray-400 mt-0.5">{c.details}</div>}
                   <div className="text-orange-400 font-bold mt-1">R$ {c.finalPrice.toFixed(2)}</div>
                 </div>
-                <button onClick={() => removeFromCart(c.cartId)} className="text-red-400 font-bold">✕</button>
+                <button onClick={() => removeFromCart(c.cartId)} className="text-red-400 font-bold p-1">✕</button>
               </div>
             ))}
           </div>
 
+          {/* Seleção de Bairro / Taxa */}
+          {neighborhoods.length > 0 && (
+            <div>
+              <label className="text-[11px] text-gray-400 block mb-1">Selecione seu Bairro (Taxa de Entrega):</label>
+              <select 
+                className="w-full bg-gray-800 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-none"
+                onChange={(e) => setSelectedNeighborhood(neighborhoods[e.target.value])}>
+                {neighborhoods.map((n, idx) => (
+                  <option key={n.id} value={idx}>
+                    {n.name} {n.fee > 0 ? `(+ R$ ${Number(n.fee).toFixed(2)})` : '(Grátis)'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Forma de Pagamento */}
+          <div>
+            <label className="text-[11px] text-gray-400 block mb-1">Forma de Pagamento:</label>
+            <select 
+              className="w-full bg-gray-800 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-none"
+              onChange={(e) => setCustomer({ ...customer, payment: e.target.value })}>
+              <option value="PIX">Pagamento via PIX</option>
+              <option value="Cartão de Crédito/Débito">Cartão na Entrega</option>
+              <option value="Dinheiro">Dinheiro (Avisar troco nas observações)</option>
+            </select>
+          </div>
+
           <input 
             placeholder="Seu Nome Completo" 
-            className="w-full bg-gray-800 text-white p-2.5 rounded-lg text-xs mb-2 border border-gray-700" 
+            className="w-full bg-gray-800 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-none" 
             onChange={(e) => setCustomer({...customer, name: e.target.value})}
           />
           <input 
-            placeholder="Endereço Completo (Rua, Nº, Bairro)" 
-            className="w-full bg-gray-800 text-white p-2.5 rounded-lg text-xs mb-3 border border-gray-700" 
+            placeholder="Endereço Completo (Rua, Nº, Ponto de Ref.)" 
+            className="w-full bg-gray-800 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-none" 
             onChange={(e) => setCustomer({...customer, address: e.target.value})}
           />
 
-          <button onClick={sendOrderToWhatsApp} className="w-full py-3.5 bg-green-600 font-bold rounded-xl text-xs">
+          <div className="bg-gray-800 p-3 rounded-lg space-y-1 text-xs">
+            <div className="flex justify-between text-gray-400">
+              <span>Subtotal:</span>
+              <span>R$ {calculateSubtotal().toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-gray-400">
+              <span>Taxa de Entrega:</span>
+              <span>R$ {Number(selectedNeighborhood?.fee || 0).toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between font-bold text-sm text-white pt-2 border-t border-gray-700">
+              <span>Total Final:</span>
+              <span style={{ color: tenant.primary_color }}>R$ {calculateTotal()}</span>
+            </div>
+          </div>
+
+          <button onClick={sendOrderToWhatsApp} className="w-full py-3.5 bg-green-600 font-bold rounded-xl text-xs hover:bg-green-700 transition">
             Enviar Pedido pelo WhatsApp 🚀
           </button>
         </div>
