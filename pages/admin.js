@@ -34,20 +34,22 @@ export default function Admin() {
         alert('Senha incorreta!');
       }
     } catch (err) {
-      alert('Erro ao conectar ao banco.');
+      alert('Erro de conexão com o banco.');
     }
   };
 
   const fetchData = async () => {
     setLoading(true);
+    const { data: cData } = await supabase.from('categories').select('*').eq('tenant_id', 1).order('id', { ascending: true });
     const { data: pData } = await supabase.from('products').select('*').eq('tenant_id', 1).order('id', { ascending: true });
-    const { data: cData } = await supabase.from('categories').select('*').eq('tenant_id', 1);
 
-    if (pData) setProducts(pData);
     if (cData) {
       setCategories(cData);
-      if (cData.length > 0) setNewProd(prev => ({ ...prev, category_id: cData[0].id }));
+      if (cData.length > 0 && !newProd.category_id) {
+        setNewProd(prev => ({ ...prev, category_id: cData[0].id }));
+      }
     }
+    if (pData) setProducts(pData);
     setLoading(false);
   };
 
@@ -56,16 +58,24 @@ export default function Admin() {
     fetchData();
   };
 
+  const deleteProduct = async (id) => {
+    if (confirm("Tem certeza que deseja excluir permanentemente este item?")) {
+      await supabase.from('products').delete().eq('id', id);
+      fetchData();
+    }
+  };
+
   const handleAddProduct = async (e) => {
     e.preventDefault();
-    if (!newProd.name || !newProd.price) return alert("Preencha nome e preço!");
+    if (!newProd.name || !newProd.price) return alert("Preencha o nome e o preço do produto!");
 
+    const selectedCategory = newProd.category_id || (categories[0] ? categories[0].id : 1);
     const fallbackImg = 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300&auto=format&fit=crop&q=80';
 
-    await supabase.from('products').insert([
+    const { error } = await supabase.from('products').insert([
       {
         tenant_id: 1,
-        category_id: newProd.category_id || (categories[0] ? categories[0].id : null),
+        category_id: parseInt(selectedCategory),
         name: newProd.name,
         description: newProd.description,
         price: parseFloat(newProd.price),
@@ -77,17 +87,22 @@ export default function Admin() {
       }
     ]);
 
-    setNewProd({
-      name: '',
-      price: '',
-      category_id: categories[0]?.id || '',
-      description: '',
-      image: '',
-      addons: 'Bacon Extra:4.50, Cheddar Extra:3.50',
-      removals: 'Sem Cebola, Sem Tomate'
-    });
-    fetchData();
-    alert("Produto cadastrado com opcionais no banco com sucesso!");
+    if (error) {
+      console.error(error);
+      alert("Erro ao cadastrar produto: " + error.message);
+    } else {
+      setNewProd({
+        name: '',
+        price: '',
+        category_id: categories[0]?.id || '',
+        description: '',
+        image: '',
+        addons: 'Bacon Extra:4.50, Cheddar Extra:3.50',
+        removals: 'Sem Cebola, Sem Tomate'
+      });
+      fetchData();
+      alert("Produto adicionado com sucesso!");
+    }
   };
 
   if (!isAuthenticated) {
@@ -122,7 +137,7 @@ export default function Admin() {
         </button>
       </header>
 
-      {/* NOVO PRODUTO COM OPÇÕES */}
+      {/* CADASTRO */}
       <section className="bg-gray-900 p-4 rounded-xl border border-gray-800 mb-6">
         <h3 className="font-bold text-sm mb-3 text-orange-400">➕ Cadastrar Lanche / Item</h3>
         <form onSubmit={handleAddProduct} className="space-y-3">
@@ -166,8 +181,8 @@ export default function Admin() {
             onChange={(e) => setNewProd({ ...newProd, image: e.target.value })}
           />
 
-          <div className="border-t border-gray-800 pt-2 mt-2">
-            <label className="text-[11px] text-gray-400 block mb-1">Adicionais (Nome:Preço, Nome:Preço):</label>
+          <div className="border-t border-gray-800 pt-2">
+            <label className="text-[11px] text-gray-400 block mb-1">Adicionais (Nome:Preço):</label>
             <input 
               type="text" 
               value={newProd.addons}
@@ -196,15 +211,25 @@ export default function Admin() {
       <section className="space-y-3">
         <h3 className="font-bold text-sm text-gray-300">📋 Produtos no Cardápio ({products.length})</h3>
         {loading ? <p className="text-xs text-gray-500">Carregando...</p> : products.map((item) => (
-          <div key={item.id} className="bg-gray-900 p-3 rounded-xl border border-gray-800 space-y-2">
-            <div className="flex justify-between items-center">
-              <span className={`font-bold text-sm ${!item.active ? 'line-through text-gray-500' : ''}`}>
+          <div key={item.id} className="bg-gray-900 p-3 rounded-xl border border-gray-800 flex justify-between items-center space-x-2">
+            <div>
+              <span className={`font-bold text-sm block ${!item.active ? 'line-through text-gray-500' : 'text-white'}`}>
                 {item.name}
               </span>
+              <span className="text-xs text-orange-400 font-bold">R$ {Number(item.price).toFixed(2)}</span>
+            </div>
+            
+            <div className="flex items-center space-x-2">
               <button 
                 onClick={() => toggleProductActive(item.id, item.active)}
-                className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${item.active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                className={`text-[10px] font-bold px-2.5 py-1.5 rounded-lg ${item.active ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
                 {item.active ? 'Ativo' : 'Pausado'}
+              </button>
+              
+              <button 
+                onClick={() => deleteProduct(item.id)}
+                className="text-xs bg-red-500/20 text-red-400 hover:bg-red-500/40 p-1.5 rounded-lg font-bold">
+                🗑
               </button>
             </div>
           </div>
