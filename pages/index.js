@@ -1,31 +1,53 @@
 import React, { useState } from 'react';
 
+// Configurações e Identidade Visual do Cliente (Borba Cordeiros)
 const clientConfig = {
   name: "Borba Cordeiros",
-  whatsapp: "5547999999999", // Altere para o WhatsApp real da loja
+  logo: "https://images.unsplash.com/photo-1550547660-d9450f859349?w=150&auto=format&fit=crop&q=80", // Substituir pelo logo real
+  banner: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80", // Substituir pelo banner real
+  whatsapp: "5547999999999", // Insira o WhatsApp da loja
   primaryColor: "#FF8C00",
   backgroundColor: "#121212",
-  textColor: "#FFFFFF"
+  textColor: "#FFFFFF",
+  categories: ["Todos", "Hambúrgueres", "Porções", "Bebidas"]
 };
 
+// Produtos com fotos reais e opcionais
 const products = [
   {
     id: 1,
     name: "X-Salada Especial Borba",
+    category: "Hambúrgueres",
     description: "Pão brioche, hambúrguer artesanal 160g, queijo cheddar, alface, tomate e maionese da casa.",
-    price: 24.90
+    price: 24.90,
+    image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300&auto=format&fit=crop&q=80"
   },
   {
     id: 2,
     name: "Porção de Batata com Cheddar e Bacon",
+    category: "Porções",
     description: "500g de batata frita crocante coberta com molho cheddar e bacon em cubos.",
-    price: 38.00
+    price: 38.00,
+    image: "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=300&auto=format&fit=crop&q=80"
+  },
+  {
+    id: 3,
+    name: "Coca-Cola Zero 350ml",
+    category: "Bebidas",
+    description: "Lata 350ml trincando de gelada.",
+    price: 6.50,
+    image: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=300&auto=format&fit=crop&q=80"
   }
 ];
 
 export default function Home() {
+  const [selectedCategory, setSelectedCategory] = useState("Todos");
   const [cart, setCart] = useState([]);
   const [customer, setCustomer] = useState({ name: '', address: '', payment: 'PIX', notes: '' });
+
+  const filteredProducts = selectedCategory === "Todos" 
+    ? products 
+    : products.filter(item => item.category === selectedCategory);
 
   const addToCart = (product) => {
     setCart([...cart, product]);
@@ -60,72 +82,111 @@ ${itemsSummary}
   };
 
   return (
-    <div style={{ backgroundColor: clientConfig.backgroundColor, color: clientConfig.textColor }} className="min-h-screen p-4 max-w-md mx-auto font-sans">
-      <header className="text-center py-6 border-b border-gray-800">
-        <h1 className="text-2xl font-bold" style={{ color: clientConfig.primaryColor }}>
+    <div style={{ backgroundColor: clientConfig.backgroundColor, color: clientConfig.textColor }} className="min-h-screen max-w-md mx-auto font-sans pb-10">
+      
+      {/* Banner & Header */}
+      <div className="relative">
+        <img src={clientConfig.banner} alt="Banner" className="w-full h-36 object-cover" />
+        <div className="absolute -bottom-6 left-4 flex items-end space-x-3">
+          <img src={clientConfig.logo} alt="Logo" className="w-16 h-16 rounded-full border-2 border-gray-900 object-cover shadow-lg" />
+        </div>
+      </div>
+
+      <header className="pt-8 px-4 border-b border-gray-800 pb-4">
+        <h1 className="text-xl font-bold" style={{ color: clientConfig.primaryColor }}>
           {clientConfig.name}
         </h1>
         <p className="text-xs text-gray-400 mt-1">Lanches & Petiscos • Entrega Rápida</p>
       </header>
 
-      <div className="mt-6 space-y-4">
-        <h2 className="text-lg font-semibold border-l-4 pl-2" style={{ borderColor: clientConfig.primaryColor }}>
-          Cardápio
-        </h2>
-        
-        {products.map((item) => (
-          <div key={item.id} className="bg-gray-900 p-3 rounded-lg flex justify-between items-center border border-gray-800">
-            <div className="pr-2">
+      {/* Categorias */}
+      <div className="flex space-x-2 overflow-x-auto p-4 scrollbar-hide">
+        {clientConfig.categories.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setSelectedCategory(cat)}
+            style={{
+              backgroundColor: selectedCategory === cat ? clientConfig.primaryColor : '#1F2937',
+              color: '#FFFFFF'
+            }}
+            className="px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition">
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      {/* Lista de Produtos com Fotos */}
+      <div className="px-4 space-y-4">
+        {filteredProducts.map((item) => (
+          <div key={item.id} className="bg-gray-900 p-3 rounded-xl flex space-x-3 items-center border border-gray-800">
+            <img src={item.image} alt={item.name} className="w-20 h-20 rounded-lg object-cover flex-shrink-0" />
+            
+            <div className="flex-1">
               <h3 className="font-bold text-sm">{item.name}</h3>
-              <p className="text-xs text-gray-400 mt-1">{item.description}</p>
-              <p className="text-sm font-bold mt-2" style={{ color: clientConfig.primaryColor }}>
-                R$ {item.price.toFixed(2)}
-              </p>
+              <p className="text-xs text-gray-400 mt-1 line-clamp-2">{item.description}</p>
+              <div className="flex justify-between items-center mt-2">
+                <span className="text-sm font-bold" style={{ color: clientConfig.primaryColor }}>
+                  R$ {item.price.toFixed(2)}
+                </span>
+                <button 
+                  onClick={() => addToCart(item)}
+                  style={{ backgroundColor: clientConfig.primaryColor }}
+                  className="text-white text-xs px-3 py-1.5 rounded-lg font-bold">
+                  + Add
+                </button>
+              </div>
             </div>
-            <button 
-              onClick={() => addToCart(item)}
-              style={{ backgroundColor: clientConfig.primaryColor }}
-              className="text-white text-xs px-3 py-2 rounded-md font-bold whitespace-nowrap">
-              + Add
-            </button>
           </div>
         ))}
       </div>
 
+      {/* Resumo do Carrinho & Checkout */}
       {cart.length > 0 && (
-        <div className="mt-8 bg-gray-900 p-4 rounded-xl border border-gray-700">
-          <h3 className="font-bold text-md mb-3">Finalizar Pedido ({cart.length} itens)</h3>
+        <div className="m-4 bg-gray-900 p-4 rounded-xl border border-gray-700 shadow-xl">
+          <h3 className="font-bold text-md mb-3 border-b border-gray-800 pb-2">
+            🛒 Resumo do Pedido ({cart.length} {cart.length === 1 ? 'item' : 'itens'})
+          </h3>
           
+          <div className="space-y-1 mb-4">
+            {cart.map((cItem, index) => (
+              <div key={index} className="flex justify-between text-xs text-gray-300">
+                <span>1x {cItem.name}</span>
+                <span>R$ {cItem.price.toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+
           <input 
             type="text" 
             placeholder="Seu Nome" 
-            className="w-full bg-gray-800 text-white p-2 rounded text-sm mb-2 border border-gray-700"
+            className="w-full bg-gray-800 text-white p-2 rounded text-sm mb-2 border border-gray-700 focus:outline-none"
             onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
           />
           <input 
             type="text" 
             placeholder="Endereço de Entrega (Rua, Nº, Bairro)" 
-            className="w-full bg-gray-800 text-white p-2 rounded text-sm mb-2 border border-gray-700"
+            className="w-full bg-gray-800 text-white p-2 rounded text-sm mb-2 border border-gray-700 focus:outline-none"
             onChange={(e) => setCustomer({ ...customer, address: e.target.value })}
           />
           
           <select 
-            className="w-full bg-gray-800 text-white p-2 rounded text-sm mb-3 border border-gray-700"
+            className="w-full bg-gray-800 text-white p-2 rounded text-sm mb-3 border border-gray-700 focus:outline-none"
             onChange={(e) => setCustomer({ ...customer, payment: e.target.value })}>
             <option value="PIX">Pagamento via PIX</option>
             <option value="Cartão de Crédito/Débito">Cartão na Entrega</option>
             <option value="Dinheiro">Dinheiro</option>
           </select>
 
-          <div className="flex justify-between font-bold text-lg mb-4">
+          <div className="flex justify-between font-bold text-lg mb-4 pt-2 border-t border-gray-800">
             <span>Total:</span>
             <span style={{ color: clientConfig.primaryColor }}>R$ {calculateTotal()}</span>
           </div>
 
           <button 
             onClick={sendOrderToWhatsApp}
-            className="w-full py-3 bg-green-600 text-white font-bold rounded-lg text-sm">
-            Enviar Pedido pelo WhatsApp 🚀
+            className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg text-sm transition flex items-center justify-center space-x-2">
+            <span>Enviar Pedido pelo WhatsApp</span>
+            <span>🚀</span>
           </button>
         </div>
       )}
