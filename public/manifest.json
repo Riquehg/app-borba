@@ -1,0 +1,15 @@
+{
+  "name": "Borba Cordeiros",
+  "short_name": "Borba",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#FF8C00",
+  "icons": [
+    {
+      "src": "https://images.unsplash.com/photo-1550547660-d9450f859349?w=192&auto=format&fit=crop&q=80",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
