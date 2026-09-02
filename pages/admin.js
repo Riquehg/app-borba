@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 export default function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
-  const [activeTab, setActiveTab] = useState('products'); // 'products', 'categories', 'addons', 'neighborhoods', 'settings'
+  const [activeTab, setActiveTab] = useState('products');
 
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -13,8 +13,9 @@ export default function Admin() {
   const [tenant, setTenant] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Forms
+  // States dos formulários
   const [newProd, setNewProd] = useState({ name: '', price: '', category_id: '', description: '', image: '', addons_list: '' });
+  const [editingProduct, setEditingProduct] = useState(null); // Item em edição
   const [newCatName, setNewCatName] = useState('');
   const [newAddon, setNewAddon] = useState({ name: '', price: '' });
   const [newNeigh, setNewNeigh] = useState({ name: '', fee: '' });
@@ -35,7 +36,7 @@ export default function Admin() {
         alert('Senha incorreta!');
       }
     } catch (err) {
-      alert('Erro de conexão.');
+      alert('Erro de conexão com o banco.');
     }
   };
 
@@ -60,15 +61,15 @@ export default function Admin() {
     setLoading(false);
   };
 
-  // --- AÇÕES DE PRODUTO ---
+  // --- AÇÕES DE PRODUTO (CRIAR / EDITAR / DELETAR) ---
   const handleAddProduct = async (e) => {
     e.preventDefault();
-    if (!newProd.name || !newProd.price) return alert("Preencha nome e preço!");
+    if (!newProd.name || !newProd.price) return alert("Preencha o nome e o preço!");
 
     const selectedCategory = newProd.category_id || (categories[0] ? categories[0].id : 1);
     const fallbackImg = 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300&auto=format&fit=crop&q=80';
 
-    await supabase.from('products').insert([{
+    const { error } = await supabase.from('products').insert([{
       tenant_id: 1,
       category_id: parseInt(selectedCategory),
       name: newProd.name,
@@ -80,9 +81,35 @@ export default function Admin() {
       addons_list: newProd.addons_list
     }]);
 
-    setNewProd({ name: '', price: '', category_id: categories[0]?.id || '', description: '', image: '', addons_list: '' });
-    fetchData();
-    alert("Produto cadastrado com sucesso!");
+    if (error) {
+      alert("Erro ao cadastrar produto: " + error.message);
+    } else {
+      setNewProd({ name: '', price: '', category_id: categories[0]?.id || '', description: '', image: '', addons_list: '' });
+      fetchData();
+      alert("Produto cadastrado com sucesso!");
+    }
+  };
+
+  const handleUpdateProduct = async (e) => {
+    e.preventDefault();
+    if (!editingProduct.name || !editingProduct.price) return alert("Preencha nome e preço!");
+
+    const { error } = await supabase.from('products').update({
+      name: editingProduct.name,
+      price: parseFloat(editingProduct.price),
+      description: editingProduct.description,
+      category_id: parseInt(editingProduct.category_id),
+      image: editingProduct.image,
+      addons_list: editingProduct.addons_list
+    }).eq('id', editingProduct.id);
+
+    if (error) {
+      alert("Erro ao atualizar produto: " + error.message);
+    } else {
+      setEditingProduct(null);
+      fetchData();
+      alert("Produto atualizado com sucesso!");
+    }
   };
 
   const toggleProductActive = async (id, currentStatus) => {
@@ -91,7 +118,7 @@ export default function Admin() {
   };
 
   const deleteProduct = async (id) => {
-    if (confirm("Excluir este produto definitivamente?")) {
+    if (confirm("Deseja excluir este produto definitivamente?")) {
       await supabase.from('products').delete().eq('id', id);
       fetchData();
     }
@@ -100,11 +127,16 @@ export default function Admin() {
   // --- AÇÕES DE CATEGORIA ---
   const handleAddCategory = async (e) => {
     e.preventDefault();
-    if (!newCatName) return alert("Digite o nome da categoria!");
-    await supabase.from('categories').insert([{ tenant_id: 1, name: newCatName }]);
-    setNewCatName('');
-    fetchData();
-    alert("Categoria criada!");
+    if (!newCatName.trim()) return alert("Digite o nome da categoria!");
+
+    const { error } = await supabase.from('categories').insert([{ tenant_id: 1, name: newCatName.trim() }]);
+    if (error) {
+      alert("Erro ao criar categoria: " + error.message);
+    } else {
+      setNewCatName('');
+      fetchData();
+      alert("Categoria criada com sucesso!");
+    }
   };
 
   const deleteCategory = async (id) => {
@@ -117,13 +149,19 @@ export default function Admin() {
   // --- AÇÕES DE ADICIONAIS GLOBAIS ---
   const handleAddGlobalAddon = async (e) => {
     e.preventDefault();
-    if (!newAddon.name || newAddon.price === '') return alert("Preencha o nome e preço do adicional!");
-    await supabase.from('global_addons').insert([{
-      tenant_id: 1, name: newAddon.name, price: parseFloat(newAddon.price)
+    if (!newAddon.name || newAddon.price === '') return alert("Preencha nome e preço do adicional!");
+
+    const { error } = await supabase.from('global_addons').insert([{
+      tenant_id: 1, name: newAddon.name.trim(), price: parseFloat(newAddon.price)
     }]);
-    setNewAddon({ name: '', price: '' });
-    fetchData();
-    alert("Adicional cadastrado!");
+
+    if (error) {
+      alert("Erro ao criar adicional: " + error.message);
+    } else {
+      setNewAddon({ name: '', price: '' });
+      fetchData();
+      alert("Adicional cadastrado!");
+    }
   };
 
   const deleteGlobalAddon = async (id) => {
@@ -136,9 +174,9 @@ export default function Admin() {
   // --- AÇÕES DE BAIRRO ---
   const handleAddNeighborhood = async (e) => {
     e.preventDefault();
-    if (!newNeigh.name || newNeigh.fee === '') return alert("Preencha bairro e taxa!");
+    if (!newNeigh.name || newNeigh.fee === '') return alert("Preencha o nome do bairro e a taxa!");
     await supabase.from('neighborhoods').insert([{
-      tenant_id: 1, name: newNeigh.name, fee: parseFloat(newNeigh.fee)
+      tenant_id: 1, name: newNeigh.name.trim(), fee: parseFloat(newNeigh.fee)
     }]);
     setNewNeigh({ name: '', fee: '' });
     fetchData();
@@ -183,7 +221,7 @@ export default function Admin() {
         </button>
       </header>
 
-      {/* ABAS DO PAINEL */}
+      {/* NAVEGAÇÃO DE ABAS */}
       <div className="flex space-x-1 bg-gray-900 p-1 rounded-xl border border-gray-800 mb-6 text-[11px] font-bold overflow-x-auto">
         <button onClick={() => setActiveTab('products')} className={`flex-1 py-2 px-2 rounded-lg whitespace-nowrap ${activeTab === 'products' ? 'bg-orange-500 text-white' : 'text-gray-400'}`}>
           🍔 Itens
@@ -234,14 +272,13 @@ export default function Admin() {
                 onChange={(e) => setNewProd({ ...newProd, image: e.target.value })}
               />
 
-              {/* SELETOR DE ADICIONAIS GLOBAIS */}
               {globalAddons.length > 0 && (
                 <div className="border-t border-gray-800 pt-2">
                   <label className="text-[11px] text-gray-400 block mb-1">Selecione os Adicionais deste Lanche:</label>
                   <div className="grid grid-cols-2 gap-2">
                     {globalAddons.map(a => {
                       const formattedStr = `${a.name}:${a.price}`;
-                      const isSelected = newProd.addons_list.includes(a.name);
+                      const isSelected = (newProd.addons_list || '').includes(a.name);
                       return (
                         <label key={a.id} className="flex items-center space-x-1.5 bg-gray-800 p-2 rounded text-[11px] cursor-pointer">
                           <input 
@@ -271,6 +308,7 @@ export default function Admin() {
             </form>
           </section>
 
+          {/* LISTA DE PRODUTOS CADASTRADOS */}
           <section className="space-y-2">
             <h3 className="font-bold text-sm text-gray-300">📋 Produtos ({products.length})</h3>
             {products.map((item) => (
@@ -281,10 +319,16 @@ export default function Admin() {
                   </span>
                   <span className="text-xs text-orange-400 font-bold">R$ {Number(item.price).toFixed(2)}</span>
                 </div>
-                <div className="flex items-center space-x-2">
+
+                <div className="flex items-center space-x-1.5">
+                  <button 
+                    onClick={() => setEditingProduct(item)}
+                    className="text-xs bg-blue-600/20 text-blue-400 p-1.5 rounded-lg font-bold">
+                    ✏️ Editar
+                  </button>
                   <button 
                     onClick={() => toggleProductActive(item.id, item.active)}
-                    className={`text-[10px] font-bold px-2.5 py-1 rounded-lg ${item.active ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                    className={`text-[10px] font-bold px-2 py-1.5 rounded-lg ${item.active ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
                     {item.active ? 'Ativo' : 'Pausado'}
                   </button>
                   <button onClick={() => deleteProduct(item.id)} className="text-xs bg-red-500/20 text-red-400 p-1.5 rounded-lg font-bold">
@@ -297,6 +341,75 @@ export default function Admin() {
         </div>
       )}
 
+      {/* MODAL DE EDIÇÃO DE PRODUTO */}
+      {editingProduct && (
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 w-full max-w-md rounded-2xl p-5 border border-gray-700 max-h-[90vh] overflow-y-auto space-y-3">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="font-bold text-sm text-orange-400">✏️ Editar Produto</h3>
+              <button onClick={() => setEditingProduct(null)} className="text-gray-400 font-bold text-sm">✕</button>
+            </div>
+
+            <form onSubmit={handleUpdateProduct} className="space-y-3">
+              <div>
+                <label className="text-[11px] text-gray-400 block mb-1">Nome do Produto:</label>
+                <input 
+                  type="text" value={editingProduct.name}
+                  className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
+                  onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] text-gray-400 block mb-1">Preço R$:</label>
+                <input 
+                  type="number" step="0.01" value={editingProduct.price}
+                  className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
+                  onChange={(e) => setEditingProduct({ ...editingProduct, price: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] text-gray-400 block mb-1">Categoria:</label>
+                <select 
+                  value={editingProduct.category_id}
+                  className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
+                  onChange={(e) => setEditingProduct({ ...editingProduct, category_id: e.target.value })}>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] text-gray-400 block mb-1">Descrição:</label>
+                <input 
+                  type="text" value={editingProduct.description || ''}
+                  className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
+                  onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] text-gray-400 block mb-1">URL da Imagem:</label>
+                <input 
+                  type="text" value={editingProduct.image || ''}
+                  className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
+                  onChange={(e) => setEditingProduct({ ...editingProduct, image: e.target.value })}
+                />
+              </div>
+
+              <div className="flex space-x-2 pt-2">
+                <button type="button" onClick={() => setEditingProduct(null)} className="w-1/2 bg-gray-800 py-2.5 rounded-lg text-xs font-bold text-gray-300">
+                  Cancelar
+                </button>
+                <button type="submit" className="w-1/2 bg-green-600 py-2.5 rounded-lg text-xs font-bold text-white">
+                  Salvar Alterações
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ABA 2: CATEGORIAS */}
       {activeTab === 'categories' && (
         <div className="space-y-6">
@@ -304,7 +417,7 @@ export default function Admin() {
             <h3 className="font-bold text-sm text-orange-400">🏷️ Nova Categoria</h3>
             <form onSubmit={handleAddCategory} className="flex space-x-2">
               <input 
-                type="text" placeholder="Nome (Ex: Sobremesas)" value={newCatName}
+                type="text" placeholder="Nome (Ex: Sobremesas, Combos)" value={newCatName}
                 className="flex-1 bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
                 onChange={(e) => setNewCatName(e.target.value)}
               />
@@ -313,10 +426,10 @@ export default function Admin() {
           </section>
 
           <section className="space-y-2">
-            <h3 className="font-bold text-sm text-gray-300">Categorias Existentes</h3>
+            <h3 className="font-bold text-sm text-gray-300">Categorias Existentes ({categories.length})</h3>
             {categories.map((c) => (
               <div key={c.id} className="bg-gray-900 p-3 rounded-xl border border-gray-800 flex justify-between items-center text-xs">
-                <span className="font-bold">{c.name}</span>
+                <span className="font-bold text-white">{c.name}</span>
                 <button onClick={() => deleteCategory(c.id)} className="text-red-400 font-bold p-1">🗑</button>
               </div>
             ))}
@@ -331,12 +444,12 @@ export default function Admin() {
             <h3 className="font-bold text-sm text-orange-400">➕ Novo Adicional</h3>
             <form onSubmit={handleAddGlobalAddon} className="space-y-3">
               <input 
-                type="text" placeholder="Nome do Adicional (Ex: Bacon Extra, Pão Brioche)" value={newAddon.name}
+                type="text" placeholder="Nome (Ex: Bacon Extra, Pão Brioche)" value={newAddon.name}
                 className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
                 onChange={(e) => setNewAddon({ ...newAddon, name: e.target.value })}
               />
               <input 
-                type="number" step="0.01" placeholder="Valor Adicional R$ (Ex: 4.50)" value={newAddon.price}
+                type="number" step="0.01" placeholder="Valor R$ (Ex: 4.50)" value={newAddon.price}
                 className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
                 onChange={(e) => setNewAddon({ ...newAddon, price: e.target.value })}
               />
@@ -347,12 +460,12 @@ export default function Admin() {
           </section>
 
           <section className="space-y-2">
-            <h3 className="font-bold text-sm text-gray-300">Adicionais Cadastrados</h3>
+            <h3 className="font-bold text-sm text-gray-300">Adicionais Cadastrados ({globalAddons.length})</h3>
             {globalAddons.map((a) => (
               <div key={a.id} className="bg-gray-900 p-3 rounded-xl border border-gray-800 flex justify-between items-center text-xs">
                 <div>
-                  <span className="font-bold block">{a.name}</span>
-                  <span className="text-orange-400">+ R$ {Number(a.price).toFixed(2)}</span>
+                  <span className="font-bold block text-white">{a.name}</span>
+                  <span className="text-orange-400 font-bold">+ R$ {Number(a.price).toFixed(2)}</span>
                 </div>
                 <button onClick={() => deleteGlobalAddon(a.id)} className="text-red-400 font-bold p-1">🗑</button>
               </div>
@@ -384,12 +497,12 @@ export default function Admin() {
           </section>
 
           <section className="space-y-2">
-            <h3 className="font-bold text-sm text-gray-300">Bairros Atendidos</h3>
+            <h3 className="font-bold text-sm text-gray-300">Bairros Atendidos ({neighborhoods.length})</h3>
             {neighborhoods.map((n) => (
               <div key={n.id} className="bg-gray-900 p-3 rounded-xl border border-gray-800 flex justify-between items-center text-xs">
                 <div>
-                  <span className="font-bold block">{n.name}</span>
-                  <span className="text-orange-400">Taxa: R$ {Number(n.fee).toFixed(2)}</span>
+                  <span className="font-bold block text-white">{n.name}</span>
+                  <span className="text-orange-400 font-bold">Taxa: R$ {Number(n.fee).toFixed(2)}</span>
                 </div>
                 <button onClick={() => deleteNeighborhood(n.id)} className="text-red-400 font-bold p-1">🗑</button>
               </div>
