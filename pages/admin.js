@@ -13,7 +13,7 @@ export default function Admin() {
   const [tenant, setTenant] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // States dos formulários
+  // Forms
   const [newProd, setNewProd] = useState({ name: '', price: '', category_id: '', description: '', image: '', addons_list: '' });
   const [editingProduct, setEditingProduct] = useState(null);
   const [newCatName, setNewCatName] = useState('');
@@ -51,7 +51,7 @@ export default function Admin() {
     if (tData) setTenant(tData);
     if (cData) {
       setCategories(cData);
-      if (cData.length > 0) {
+      if (cData.length > 0 && !newProd.category_id) {
         setNewProd(prev => ({ ...prev, category_id: cData[0].id }));
       }
     }
@@ -61,10 +61,13 @@ export default function Admin() {
     setLoading(false);
   };
 
-  // PRODUTOS
+  // CADASTRAR PRODUTO
   const handleAddProduct = async (e) => {
     e.preventDefault();
-    if (!newProd.name || !newProd.price) return alert("Preencha o nome e o preço!");
+    if (!newProd.name || !newProd.price) return alert("Preencha nome e preço!");
+
+    const formattedPrice = parseFloat(String(newProd.price).replace(',', '.'));
+    if (isNaN(formattedPrice)) return alert("Preço inválido!");
 
     const selectedCategory = newProd.category_id || (categories[0] ? categories[0].id : 1);
     const fallbackImg = 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300&auto=format&fit=crop&q=80';
@@ -74,7 +77,7 @@ export default function Admin() {
       category_id: parseInt(selectedCategory),
       name: newProd.name,
       description: newProd.description,
-      price: parseFloat(newProd.price),
+      price: formattedPrice,
       image: newProd.image || fallbackImg,
       active: true,
       has_options: true,
@@ -90,13 +93,17 @@ export default function Admin() {
     }
   };
 
+  // ATUALIZAR PRODUTO (SALVAR EDIÇÃO)
   const handleUpdateProduct = async (e) => {
     e.preventDefault();
     if (!editingProduct.name || !editingProduct.price) return alert("Preencha nome e preço!");
 
+    const formattedPrice = parseFloat(String(editingProduct.price).replace(',', '.'));
+    if (isNaN(formattedPrice)) return alert("Preço inválido!");
+
     const { error } = await supabase.from('products').update({
       name: editingProduct.name,
-      price: parseFloat(editingProduct.price),
+      price: formattedPrice,
       description: editingProduct.description,
       category_id: parseInt(editingProduct.category_id),
       image: editingProduct.image,
@@ -104,7 +111,7 @@ export default function Admin() {
     }).eq('id', editingProduct.id);
 
     if (error) {
-      alert("Erro ao atualizar: " + error.message);
+      alert("Erro ao atualizar produto: " + error.message);
     } else {
       setEditingProduct(null);
       fetchData();
@@ -151,8 +158,11 @@ export default function Admin() {
     e.preventDefault();
     if (!newAddon.name || newAddon.price === '') return alert("Preencha nome e preço do adicional!");
 
+    const formattedPrice = parseFloat(String(newAddon.price).replace(',', '.'));
+    if (isNaN(formattedPrice)) return alert("Preço do adicional inválido!");
+
     const { error } = await supabase.from('global_addons').insert([{
-      tenant_id: 1, name: newAddon.name.trim(), price: parseFloat(newAddon.price)
+      tenant_id: 1, name: newAddon.name.trim(), price: formattedPrice
     }]);
 
     if (error) {
@@ -175,8 +185,11 @@ export default function Admin() {
   const handleAddNeighborhood = async (e) => {
     e.preventDefault();
     if (!newNeigh.name || newNeigh.fee === '') return alert("Preencha bairro e taxa!");
+    
+    const formattedFee = parseFloat(String(newNeigh.fee).replace(',', '.'));
+
     await supabase.from('neighborhoods').insert([{
-      tenant_id: 1, name: newNeigh.name.trim(), fee: parseFloat(newNeigh.fee)
+      tenant_id: 1, name: newNeigh.name.trim(), fee: formattedFee
     }]);
     setNewNeigh({ name: '', fee: '' });
     fetchData();
@@ -221,7 +234,7 @@ export default function Admin() {
         </button>
       </header>
 
-      {/* NAVEGAÇÃO DE ABAS */}
+      {/* ABAS */}
       <div className="flex space-x-1 bg-gray-900 p-1 rounded-xl border border-gray-800 mb-6 text-[11px] font-bold overflow-x-auto">
         <button onClick={() => setActiveTab('products')} className={`flex-1 py-2 px-2 rounded-lg whitespace-nowrap ${activeTab === 'products' ? 'bg-orange-500 text-white' : 'text-gray-400'}`}>
           🍔 Itens
@@ -237,7 +250,7 @@ export default function Admin() {
         </button>
       </div>
 
-      {/* ABA PRODUTOS */}
+      {/* PRODUTOS */}
       {activeTab === 'products' && (
         <div className="space-y-6">
           <section className="bg-gray-900 p-4 rounded-xl border border-gray-800 space-y-3">
@@ -255,7 +268,7 @@ export default function Admin() {
               />
               <div className="flex space-x-2">
                 <input 
-                  type="number" step="0.01" placeholder="Preço (R$)" value={newProd.price}
+                  type="text" placeholder="Preço R$" value={newProd.price}
                   className="w-1/2 bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
                   onChange={(e) => setNewProd({ ...newProd, price: e.target.value })}
                 />
@@ -308,6 +321,7 @@ export default function Admin() {
             </form>
           </section>
 
+          {/* LISTA */}
           <section className="space-y-2">
             <h3 className="font-bold text-sm text-gray-300">📋 Produtos ({products.length})</h3>
             {products.map((item) => (
@@ -340,7 +354,7 @@ export default function Admin() {
         </div>
       )}
 
-      {/* MODAL DE EDIÇÃO DE PRODUTO */}
+      {/* MODAL DE EDIÇÃO COM SELEÇÃO DE ADICIONAIS */}
       {editingProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 w-full max-w-md rounded-2xl p-5 border border-gray-700 max-h-[90vh] overflow-y-auto space-y-3">
@@ -362,7 +376,7 @@ export default function Admin() {
               <div>
                 <label className="text-[11px] text-gray-400 block mb-1">Preço R$:</label>
                 <input 
-                  type="number" step="0.01" value={editingProduct.price}
+                  type="text" value={editingProduct.price}
                   className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
                   onChange={(e) => setEditingProduct({ ...editingProduct, price: e.target.value })}
                 />
@@ -396,6 +410,37 @@ export default function Admin() {
                 />
               </div>
 
+              {/* SELEÇÃO DE ADICIONAIS DENTRO DA EDIÇÃO */}
+              {globalAddons.length > 0 && (
+                <div className="border-t border-gray-800 pt-2">
+                  <label className="text-[11px] text-gray-400 block mb-1">Gerenciar Adicionais deste Lanche:</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {globalAddons.map(a => {
+                      const formattedStr = `${a.name}:${a.price}`;
+                      const isSelected = (editingProduct.addons_list || '').includes(a.name);
+                      return (
+                        <label key={a.id} className="flex items-center space-x-1.5 bg-gray-800 p-2 rounded text-[11px] cursor-pointer">
+                          <input 
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              let currentArr = editingProduct.addons_list ? editingProduct.addons_list.split(',').filter(Boolean) : [];
+                              if (e.target.checked) {
+                                currentArr.push(formattedStr);
+                              } else {
+                                currentArr = currentArr.filter(item => !item.startsWith(a.name));
+                              }
+                              setEditingProduct({ ...editingProduct, addons_list: currentArr.join(',') });
+                            }}
+                          />
+                          <span className="truncate">{a.name} (+R${Number(a.price).toFixed(2)})</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="flex space-x-2 pt-2">
                 <button type="button" onClick={() => setEditingProduct(null)} className="w-1/2 bg-gray-800 py-2.5 rounded-lg text-xs font-bold text-gray-300">
                   Cancelar
@@ -409,7 +454,7 @@ export default function Admin() {
         </div>
       )}
 
-      {/* ABA CATEGORIAS */}
+      {/* CATEGORIAS */}
       {activeTab === 'categories' && (
         <div className="space-y-6">
           <section className="bg-gray-900 p-4 rounded-xl border border-gray-800 space-y-3">
@@ -436,7 +481,7 @@ export default function Admin() {
         </div>
       )}
 
-      {/* ABA ADICIONAIS GLOBAIS */}
+      {/* ADICIONAIS GLOBAIS */}
       {activeTab === 'addons' && (
         <div className="space-y-6">
           <section className="bg-gray-900 p-4 rounded-xl border border-gray-800 space-y-3">
@@ -448,7 +493,7 @@ export default function Admin() {
                 onChange={(e) => setNewAddon({ ...newAddon, name: e.target.value })}
               />
               <input 
-                type="number" step="0.01" placeholder="Valor R$ (Ex: 4.50)" value={newAddon.price}
+                type="text" placeholder="Valor R$ (Ex: 4.50 ou 4,50)" value={newAddon.price}
                 className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
                 onChange={(e) => setNewAddon({ ...newAddon, price: e.target.value })}
               />
@@ -473,7 +518,7 @@ export default function Admin() {
         </div>
       )}
 
-      {/* ABA BAIRROS */}
+      {/* BAIRROS */}
       {activeTab === 'neighborhoods' && (
         <div className="space-y-6">
           <section className="bg-gray-900 p-4 rounded-xl border border-gray-800 space-y-3">
@@ -485,7 +530,7 @@ export default function Admin() {
                 onChange={(e) => setNewNeigh({ ...newNeigh, name: e.target.value })}
               />
               <input 
-                type="number" step="0.01" placeholder="Taxa R$ (Ex: 5.00)" value={newNeigh.fee}
+                type="text" placeholder="Taxa R$ (Ex: 5.00)" value={newNeigh.fee}
                 className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
                 onChange={(e) => setNewNeigh({ ...newNeigh, fee: e.target.value })}
               />
