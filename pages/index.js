@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 // Configurações e Identidade Visual do Cliente (Borba Cordeiros)
 const clientConfig = {
   name: "Borba Cordeiros",
-  logo: "https://www.facebook.com/photo/?fbid=122094956619350817&set=a.122094954597350817w=150&auto=format&fit=crop&q=80", // Substituir pelo logo real
+  logo: "https://www.facebook.com/photo/?fbid=122094956619350817&set=a.122094954597350817?w=150&auto=format&fit=crop&q=80", // Substituir pelo logo real
   banner: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80", // Substituir pelo banner real
   whatsapp: "5547999999999", // Insira o WhatsApp da loja
   primaryColor: "#FF8C00",
