@@ -17,8 +17,16 @@ export default function Home() {
   
   const [selectedCategoryId, setSelectedCategoryId] = useState("all");
   const [cart, setCart] = useState([]);
+  
+  // Checkout Anti-Fraude
+  const [orderType, setOrderType] = useState('delivery'); // 'delivery' ou 'pickup'
   const [selectedNeighborhood, setSelectedNeighborhood] = useState(null);
-  const [customer, setCustomer] = useState({ name: '', address: '', payment: 'PIX', notes: '' });
+  const [customer, setCustomer] = useState({
+    name: '',
+    streetAndNumber: '',
+    reference: '',
+    payment: 'PIX'
+  });
 
   // Modal State
   const [activeModalProduct, setActiveModalProduct] = useState(null);
@@ -41,7 +49,7 @@ export default function Home() {
           setSelectedNeighborhood(nData[0]);
         }
       } catch (e) {
-        console.log("Erro de dados");
+        console.log("Erro ao carregar dados do banco");
       }
     }
     loadData();
@@ -96,11 +104,17 @@ export default function Home() {
   };
 
   const calculateSubtotal = () => cart.reduce((sum, item) => sum + item.finalPrice, 0);
-  const calculateTotal = () => (calculateSubtotal() + (selectedNeighborhood?.fee || 0)).toFixed(2);
+  const currentDeliveryFee = orderType === 'delivery' ? Number(selectedNeighborhood?.fee || 0) : 0;
+  const calculateTotal = () => (calculateSubtotal() + currentDeliveryFee).toFixed(2);
 
   const sendOrderToWhatsApp = () => {
     if (cart.length === 0) return alert("Seu carrinho está vazio!");
-    if (!customer.name || !customer.address) return alert("Preencha seu nome e endereço!");
+    if (!customer.name.trim()) return alert("Preencha seu Nome Completo!");
+
+    if (orderType === 'delivery') {
+      if (!selectedNeighborhood) return alert("Selecione o Bairro para entrega!");
+      if (!customer.streetAndNumber.trim()) return alert("Preencha a Rua e o Número da residência!");
+    }
 
     let itemsSummary = cart.map(item => {
       let line = `• 1x ${item.name} (R$ ${item.finalPrice.toFixed(2)})`;
@@ -108,11 +122,15 @@ export default function Home() {
       return line;
     }).join('\n');
     
+    let addressInfo = orderType === 'delivery' 
+      ? `*Tipo:* ENTREGA 🛵\n*Bairro:* ${selectedNeighborhood?.name}\n*Endereço:* ${customer.streetAndNumber}${customer.reference ? `\n*Ref:* ${customer.reference}` : ''}`
+      : `*Tipo:* RETIRADA NO BALCÃO 🛍️`;
+
     const message = 
 `*NOVO PEDIDO - ${tenant.name.toUpperCase()}* 🍔
 ----------------------------------
 *Cliente:* ${customer.name}
-*Endereço:* ${customer.address} (${selectedNeighborhood?.name || 'Entrega'})
+${addressInfo}
 *Pagamento:* ${customer.payment}
 
 *ITENS DO PEDIDO:*
@@ -120,7 +138,7 @@ ${itemsSummary}
 
 ----------------------------------
 *Subtotal:* R$ ${calculateSubtotal().toFixed(2)}
-*Taxa (${selectedNeighborhood?.name}):* R$ ${Number(selectedNeighborhood?.fee || 0).toFixed(2)}
+*Taxa de Entrega:* ${orderType === 'delivery' ? `R$ ${currentDeliveryFee.toFixed(2)}` : 'R$ 0,00 (Retirada)'}
 *TOTAL DO PEDIDO:* R$ ${calculateTotal()}
 ----------------------------------`;
 
@@ -179,7 +197,7 @@ ${itemsSummary}
         ))}
       </div>
 
-      {/* MODAL DE PERSONALIZAÇÃO COM OBSERVAÇÃO */}
+      {/* MODAL DE PERSONALIZAÇÃO */}
       {activeModalProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-end justify-center z-50 p-0">
           <div className="bg-gray-900 w-full max-w-md rounded-t-2xl p-5 border-t border-gray-700 max-h-[85vh] overflow-y-auto">
@@ -191,7 +209,6 @@ ${itemsSummary}
               <button onClick={() => setActiveModalProduct(null)} className="text-gray-400 font-bold text-lg">✕</button>
             </div>
 
-            {/* Adicionais */}
             {parseAddons(activeModalProduct.addons_list).length > 0 && (
               <div className="mb-4">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-orange-400 mb-2">Deseja Adicionais?</h4>
@@ -213,7 +230,6 @@ ${itemsSummary}
               </div>
             )}
 
-            {/* CAMPO DE OBSERVAÇÃO LIVRE */}
             <div className="mb-6">
               <h4 className="text-xs font-bold uppercase tracking-wider text-orange-400 mb-2">Observações do Lanche:</h4>
               <textarea 
@@ -235,15 +251,16 @@ ${itemsSummary}
         </div>
       )}
 
-      {/* ÁREA DO CARRINHO */}
+      {/* ÁREA DO CARRINHO E CHECKOUT CORRIGIDA */}
       {cart.length > 0 && (
-        <div className="m-4 mt-8 bg-gray-900 p-4 rounded-xl border border-gray-700 shadow-xl space-y-3">
+        <div className="m-4 mt-8 bg-gray-900 p-4 rounded-xl border border-gray-700 shadow-xl space-y-4">
           <h3 className="font-bold text-md border-b border-gray-800 pb-2 flex justify-between">
             <span>🛒 Seu Carrinho</span>
             <span className="text-xs text-gray-400">{cart.length} itens</span>
           </h3>
 
-          <div className="space-y-2 mb-2">
+          {/* LISTA DE ITENS NO CARRINHO */}
+          <div className="space-y-2">
             {cart.map((c) => (
               <div key={c.cartId} className="flex justify-between text-xs bg-gray-800 p-2.5 rounded-lg">
                 <div>
@@ -256,43 +273,92 @@ ${itemsSummary}
             ))}
           </div>
 
-          {neighborhoods.length > 0 && (
-            <div>
-              <label className="text-[11px] text-gray-400 block mb-1">Selecione seu Bairro (Taxa de Entrega):</label>
-              <select 
-                className="w-full bg-gray-800 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-none"
-                onChange={(e) => setSelectedNeighborhood(neighborhoods[e.target.value])}>
-                {neighborhoods.map((n, idx) => (
-                  <option key={n.id} value={idx}>
-                    {n.name} {n.fee > 0 ? `(+ R$ ${Number(n.fee).toFixed(2)})` : '(Grátis)'}
-                  </option>
-                ))}
-              </select>
+          {/* CHAVEADOR: ENTREGA OU RETIRADA */}
+          <div className="pt-2">
+            <label className="text-[11px] text-gray-400 block mb-1.5 font-bold">Como deseja receber seu pedido?</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button 
+                type="button"
+                onClick={() => setOrderType('delivery')}
+                className={`py-2.5 px-2 rounded-lg text-xs font-bold border transition ${orderType === 'delivery' ? 'bg-orange-500 border-orange-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400'}`}>
+                🛵 Entrega (Delivery)
+              </button>
+              <button 
+                type="button"
+                onClick={() => setOrderType('pickup')}
+                className={`py-2.5 px-2 rounded-lg text-xs font-bold border transition ${orderType === 'pickup' ? 'bg-orange-500 border-orange-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400'}`}>
+                🛍️ Retirar no Balcão
+              </button>
             </div>
-          )}
-
-          <div>
-            <label className="text-[11px] text-gray-400 block mb-1">Forma de Pagamento:</label>
-            <select 
-              className="w-full bg-gray-800 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-none"
-              onChange={(e) => setCustomer({ ...customer, payment: e.target.value })}>
-              <option value="PIX">Pagamento via PIX</option>
-              <option value="Cartão de Crédito/Débito">Cartão na Entrega</option>
-              <option value="Dinheiro">Dinheiro (Avisar troco nas observações)</option>
-            </select>
           </div>
 
-          <input 
-            placeholder="Seu Nome Completo" 
-            className="w-full bg-gray-800 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-none" 
-            onChange={(e) => setCustomer({...customer, name: e.target.value})}
-          />
-          <input 
-            placeholder="Endereço Completo (Rua, Nº, Ponto de Ref.)" 
-            className="w-full bg-gray-800 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-none" 
-            onChange={(e) => setCustomer({...customer, address: e.target.value})}
-          />
+          {/* DADOS DO CLIENTE E ENDEREÇO */}
+          <div className="space-y-2 pt-1">
+            <input 
+              type="text"
+              placeholder="Seu Nome Completo" 
+              value={customer.name}
+              className="w-full bg-gray-800 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-none" 
+              onChange={(e) => setCustomer({...customer, name: e.target.value})}
+            />
 
+            {/* SE FOR ENTREGA: EXIBE BAIRRO OBRIGATÓRIO E ENDEREÇO */}
+            {orderType === 'delivery' && (
+              <>
+                {neighborhoods.length > 0 && (
+                  <div>
+                    <label className="text-[11px] text-gray-400 block mb-1">Selecione seu Bairro (Taxa Fixa):</label>
+                    <select 
+                      className="w-full bg-gray-800 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-none font-bold"
+                      onChange={(e) => setSelectedNeighborhood(neighborhoods[e.target.value])}>
+                      {neighborhoods.map((n, idx) => (
+                        <option key={n.id} value={idx}>
+                          {n.name} (+ R$ {Number(n.fee).toFixed(2)})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <input 
+                  type="text"
+                  placeholder="Nome da Rua e Número (Ex: Rua Olavo Bilac, 120)" 
+                  value={customer.streetAndNumber}
+                  className="w-full bg-gray-800 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-none" 
+                  onChange={(e) => setCustomer({...customer, streetAndNumber: e.target.value})}
+                />
+
+                <input 
+                  type="text"
+                  placeholder="Ponto de Referência / Apto / Bloco (Opcional)" 
+                  value={customer.reference}
+                  className="w-full bg-gray-800 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-none" 
+                  onChange={(e) => setCustomer({...customer, reference: e.target.value})}
+                />
+              </>
+            )}
+
+            {/* SE FOR RETIRADA: AVISO SIMPLES */}
+            {orderType === 'pickup' && (
+              <div className="bg-orange-500/10 border border-orange-500/30 p-3 rounded-lg text-xs text-orange-300">
+                📍 <b>Retirada no Local:</b> Seu pedido será preparado e você poderá retirar diretamente no balcão do restaurante.
+              </div>
+            )}
+
+            {/* FORMA DE PAGAMENTO */}
+            <div>
+              <label className="text-[11px] text-gray-400 block mb-1">Forma de Pagamento:</label>
+              <select 
+                className="w-full bg-gray-800 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-none"
+                onChange={(e) => setCustomer({ ...customer, payment: e.target.value })}>
+                <option value="PIX">Pagamento via PIX</option>
+                <option value="Cartão de Crédito/Débito">Cartão na Entrega / Retirada</option>
+                <option value="Dinheiro">Dinheiro (Avisar troco nas observações)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* RESUMO DE VALORES */}
           <div className="bg-gray-800 p-3 rounded-lg space-y-1 text-xs">
             <div className="flex justify-between text-gray-400">
               <span>Subtotal:</span>
@@ -300,7 +366,9 @@ ${itemsSummary}
             </div>
             <div className="flex justify-between text-gray-400">
               <span>Taxa de Entrega:</span>
-              <span>R$ {Number(selectedNeighborhood?.fee || 0).toFixed(2)}</span>
+              <span className="font-bold text-orange-400">
+                {orderType === 'delivery' ? `R$ ${currentDeliveryFee.toFixed(2)}` : 'Grátis (Retirada)'}
+              </span>
             </div>
             <div className="flex justify-between font-bold text-sm text-white pt-2 border-t border-gray-700">
               <span>Total Final:</span>
