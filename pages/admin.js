@@ -8,7 +8,15 @@ export default function Admin() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const [newProd, setNewProd] = useState({ name: '', price: '', category_id: '', description: '' });
+  const [newProd, setNewProd] = useState({
+    name: '',
+    price: '',
+    category_id: '',
+    description: '',
+    image: '',
+    addons: 'Bacon Extra:4.50, Cheddar Extra:3.50, Burguer Extra:8.00',
+    removals: 'Sem Cebola, Sem Tomate, Sem Maionese'
+  });
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -17,7 +25,6 @@ export default function Admin() {
       fetchData();
       return;
     }
-
     try {
       const { data } = await supabase.from('tenants').select('admin_password').eq('id', 1).single();
       if (data && password === data.admin_password) {
@@ -27,7 +34,7 @@ export default function Admin() {
         alert('Senha incorreta!');
       }
     } catch (err) {
-      alert('Erro de conexão com o banco. Tente novamente.');
+      alert('Erro ao conectar ao banco.');
     }
   };
 
@@ -53,6 +60,8 @@ export default function Admin() {
     e.preventDefault();
     if (!newProd.name || !newProd.price) return alert("Preencha nome e preço!");
 
+    const fallbackImg = 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300&auto=format&fit=crop&q=80';
+
     await supabase.from('products').insert([
       {
         tenant_id: 1,
@@ -60,14 +69,25 @@ export default function Admin() {
         name: newProd.name,
         description: newProd.description,
         price: parseFloat(newProd.price),
-        image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300&auto=format&fit=crop&q=80',
-        active: true
+        image: newProd.image || fallbackImg,
+        active: true,
+        has_options: true,
+        addons_list: newProd.addons,
+        removals_list: newProd.removals
       }
     ]);
 
-    setNewProd({ name: '', price: '', category_id: categories[0]?.id || '', description: '' });
+    setNewProd({
+      name: '',
+      price: '',
+      category_id: categories[0]?.id || '',
+      description: '',
+      image: '',
+      addons: 'Bacon Extra:4.50, Cheddar Extra:3.50',
+      removals: 'Sem Cebola, Sem Tomate'
+    });
     fetchData();
-    alert("Produto cadastrado no banco com sucesso!");
+    alert("Produto cadastrado com opcionais no banco com sucesso!");
   };
 
   if (!isAuthenticated) {
@@ -95,35 +115,37 @@ export default function Admin() {
       <header className="flex justify-between items-center py-4 border-b border-gray-800 mb-6">
         <div>
           <h1 className="font-bold text-lg text-orange-500">Gestão de Cardápio</h1>
-          <p className="text-xs text-gray-400">Banco de Dados em Tempo Real</p>
+          <p className="text-xs text-gray-400">Banco em Tempo Real</p>
         </div>
         <button onClick={() => setIsAuthenticated(false)} className="text-xs bg-gray-800 px-3 py-1.5 rounded-lg text-red-400 font-bold">
           Sair
         </button>
       </header>
 
+      {/* NOVO PRODUTO COM OPÇÕES */}
       <section className="bg-gray-900 p-4 rounded-xl border border-gray-800 mb-6">
-        <h3 className="font-bold text-sm mb-3 text-orange-400">➕ Cadastrar Item no Banco</h3>
+        <h3 className="font-bold text-sm mb-3 text-orange-400">➕ Cadastrar Lanche / Item</h3>
         <form onSubmit={handleAddProduct} className="space-y-3">
           <input 
             type="text" 
-            placeholder="Nome (Ex: X-Bacon Supremo)"
+            placeholder="Nome do Produto (Ex: X-Bacon)"
             value={newProd.name}
             className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
             onChange={(e) => setNewProd({ ...newProd, name: e.target.value })}
           />
           <input 
             type="text" 
-            placeholder="Descrição curta"
+            placeholder="Descrição curta (Ex: Pão brioche, carne 160g...)"
             value={newProd.description}
             className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
             onChange={(e) => setNewProd({ ...newProd, description: e.target.value })}
           />
+          
           <div className="flex space-x-2">
             <input 
               type="number" 
               step="0.01"
-              placeholder="Preço (Ex: 29.90)"
+              placeholder="Preço (R$)"
               value={newProd.price}
               className="w-1/2 bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
               onChange={(e) => setNewProd({ ...newProd, price: e.target.value })}
@@ -135,15 +157,45 @@ export default function Admin() {
               {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
-          <button type="submit" className="w-full bg-green-600 hover:bg-green-700 font-bold py-2.5 rounded-lg text-xs">
-            Salvar no Banco
+
+          <input 
+            type="text" 
+            placeholder="Link da Foto (ImgBB / Instagram ou Deixe em branco)"
+            value={newProd.image}
+            className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
+            onChange={(e) => setNewProd({ ...newProd, image: e.target.value })}
+          />
+
+          <div className="border-t border-gray-800 pt-2 mt-2">
+            <label className="text-[11px] text-gray-400 block mb-1">Adicionais (Nome:Preço, Nome:Preço):</label>
+            <input 
+              type="text" 
+              value={newProd.addons}
+              className="w-full bg-gray-800 border border-gray-700 p-2 rounded text-xs text-white focus:outline-none"
+              onChange={(e) => setNewProd({ ...newProd, addons: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] text-gray-400 block mb-1">Remoções (Separadas por vírgula):</label>
+            <input 
+              type="text" 
+              value={newProd.removals}
+              className="w-full bg-gray-800 border border-gray-700 p-2 rounded text-xs text-white focus:outline-none"
+              onChange={(e) => setNewProd({ ...newProd, removals: e.target.value })}
+            />
+          </div>
+
+          <button type="submit" className="w-full bg-green-600 hover:bg-green-700 font-bold py-2.5 rounded-lg text-xs mt-2">
+            Salvar Lanche no Banco 🚀
           </button>
         </form>
       </section>
 
+      {/* LISTA */}
       <section className="space-y-3">
-        <h3 className="font-bold text-sm text-gray-300">📋 Produtos Ativos ({products.length})</h3>
-        {loading ? <p className="text-xs text-gray-500">Carregando dados...</p> : products.map((item) => (
+        <h3 className="font-bold text-sm text-gray-300">📋 Produtos no Cardápio ({products.length})</h3>
+        {loading ? <p className="text-xs text-gray-500">Carregando...</p> : products.map((item) => (
           <div key={item.id} className="bg-gray-900 p-3 rounded-xl border border-gray-800 space-y-2">
             <div className="flex justify-between items-center">
               <span className={`font-bold text-sm ${!item.active ? 'line-through text-gray-500' : ''}`}>
@@ -152,7 +204,7 @@ export default function Admin() {
               <button 
                 onClick={() => toggleProductActive(item.id, item.active)}
                 className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${item.active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                {item.active ? 'Disponível' : 'Pausado'}
+                {item.active ? 'Ativo' : 'Pausado'}
               </button>
             </div>
           </div>
