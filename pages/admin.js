@@ -4,21 +4,19 @@ import { supabase } from '../lib/supabase';
 export default function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
-  const [activeTab, setActiveTab] = useState('products'); // 'products', 'categories', 'neighborhoods', 'settings'
+  const [activeTab, setActiveTab] = useState('products'); // 'products', 'categories', 'addons', 'neighborhoods', 'settings'
 
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [globalAddons, setGlobalAddons] = useState([]);
   const [neighborhoods, setNeighborhoods] = useState([]);
   const [tenant, setTenant] = useState(null);
   const [loading, setLoading] = useState(false);
 
   // Forms
-  const [newProd, setNewProd] = useState({
-    name: '', price: '', category_id: '', description: '', image: '',
-    addons: 'Bacon Extra:4.50, Cheddar Extra:3.50, Burguer Extra:8.00',
-    removals: 'Sem Cebola, Sem Tomate, Sem Maionese'
-  });
+  const [newProd, setNewProd] = useState({ name: '', price: '', category_id: '', description: '', image: '', addons_list: '' });
   const [newCatName, setNewCatName] = useState('');
+  const [newAddon, setNewAddon] = useState({ name: '', price: '' });
   const [newNeigh, setNewNeigh] = useState({ name: '', fee: '' });
 
   const handleLogin = async (e) => {
@@ -46,6 +44,7 @@ export default function Admin() {
     const { data: tData } = await supabase.from('tenants').select('*').eq('id', 1).single();
     const { data: cData } = await supabase.from('categories').select('*').eq('tenant_id', 1).order('id', { ascending: true });
     const { data: pData } = await supabase.from('products').select('*').eq('tenant_id', 1).order('id', { ascending: true });
+    const { data: aData } = await supabase.from('global_addons').select('*').eq('tenant_id', 1).order('id', { ascending: true });
     const { data: nData } = await supabase.from('neighborhoods').select('*').eq('tenant_id', 1).order('id', { ascending: true });
 
     if (tData) setTenant(tData);
@@ -56,6 +55,7 @@ export default function Admin() {
       }
     }
     if (pData) setProducts(pData);
+    if (aData) setGlobalAddons(aData);
     if (nData) setNeighborhoods(nData);
     setLoading(false);
   };
@@ -77,14 +77,10 @@ export default function Admin() {
       image: newProd.image || fallbackImg,
       active: true,
       has_options: true,
-      addons_list: newProd.addons,
-      removals_list: newProd.removals
+      addons_list: newProd.addons_list
     }]);
 
-    setNewProd({
-      name: '', price: '', category_id: categories[0]?.id || '', description: '', image: '',
-      addons: 'Bacon Extra:4.50, Cheddar Extra:3.50', removals: 'Sem Cebola, Sem Tomate'
-    });
+    setNewProd({ name: '', price: '', category_id: categories[0]?.id || '', description: '', image: '', addons_list: '' });
     fetchData();
     alert("Produto cadastrado com sucesso!");
   };
@@ -118,10 +114,29 @@ export default function Admin() {
     }
   };
 
+  // --- AÇÕES DE ADICIONAIS GLOBAIS ---
+  const handleAddGlobalAddon = async (e) => {
+    e.preventDefault();
+    if (!newAddon.name || newAddon.price === '') return alert("Preencha o nome e preço do adicional!");
+    await supabase.from('global_addons').insert([{
+      tenant_id: 1, name: newAddon.name, price: parseFloat(newAddon.price)
+    }]);
+    setNewAddon({ name: '', price: '' });
+    fetchData();
+    alert("Adicional cadastrado!");
+  };
+
+  const deleteGlobalAddon = async (id) => {
+    if (confirm("Excluir este adicional?")) {
+      await supabase.from('global_addons').delete().eq('id', id);
+      fetchData();
+    }
+  };
+
   // --- AÇÕES DE BAIRRO ---
   const handleAddNeighborhood = async (e) => {
     e.preventDefault();
-    if (!newNeigh.name || newNeigh.fee === '') return alert("Preencha o nome do bairro e a taxa!");
+    if (!newNeigh.name || newNeigh.fee === '') return alert("Preencha bairro e taxa!");
     await supabase.from('neighborhoods').insert([{
       tenant_id: 1, name: newNeigh.name, fee: parseFloat(newNeigh.fee)
     }]);
@@ -137,16 +152,6 @@ export default function Admin() {
     }
   };
 
-  // --- ATUALIZAR WHATSAPP DA LOJA ---
-  const handleUpdateTenant = async (e) => {
-    e.preventDefault();
-    await supabase.from('tenants').update({
-      whatsapp: tenant.whatsapp,
-      name: tenant.name
-    }).eq('id', 1);
-    alert("Configurações atualizadas!");
-  };
-
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center p-4 font-sans">
@@ -154,8 +159,7 @@ export default function Admin() {
           <h2 className="text-xl font-bold text-orange-500 mb-1 text-center">Painel de Gestão</h2>
           <p className="text-xs text-gray-400 text-center mb-6">Borba Cordeiros</p>
           <input 
-            type="password" 
-            placeholder="Senha de acesso..."
+            type="password" placeholder="Senha de acesso..."
             className="w-full bg-gray-800 border border-gray-700 p-3 rounded-xl text-sm mb-4 text-white focus:outline-none"
             onChange={(e) => setPassword(e.target.value)}
           />
@@ -179,27 +183,19 @@ export default function Admin() {
         </button>
       </header>
 
-      {/* NAVEGAÇÃO POR ABAS */}
-      <div className="flex space-x-1 bg-gray-900 p-1 rounded-xl border border-gray-800 mb-6 text-xs font-bold">
-        <button 
-          onClick={() => setActiveTab('products')} 
-          className={`flex-1 py-2 rounded-lg transition ${activeTab === 'products' ? 'bg-orange-500 text-white' : 'text-gray-400'}`}>
+      {/* ABAS DO PAINEL */}
+      <div className="flex space-x-1 bg-gray-900 p-1 rounded-xl border border-gray-800 mb-6 text-[11px] font-bold overflow-x-auto">
+        <button onClick={() => setActiveTab('products')} className={`flex-1 py-2 px-2 rounded-lg whitespace-nowrap ${activeTab === 'products' ? 'bg-orange-500 text-white' : 'text-gray-400'}`}>
           🍔 Itens
         </button>
-        <button 
-          onClick={() => setActiveTab('categories')} 
-          className={`flex-1 py-2 rounded-lg transition ${activeTab === 'categories' ? 'bg-orange-500 text-white' : 'text-gray-400'}`}>
+        <button onClick={() => setActiveTab('categories')} className={`flex-1 py-2 px-2 rounded-lg whitespace-nowrap ${activeTab === 'categories' ? 'bg-orange-500 text-white' : 'text-gray-400'}`}>
           🏷️ Categorias
         </button>
-        <button 
-          onClick={() => setActiveTab('neighborhoods')} 
-          className={`flex-1 py-2 rounded-lg transition ${activeTab === 'neighborhoods' ? 'bg-orange-500 text-white' : 'text-gray-400'}`}>
-          🛵 Bairros
+        <button onClick={() => setActiveTab('addons')} className={`flex-1 py-2 px-2 rounded-lg whitespace-nowrap ${activeTab === 'addons' ? 'bg-orange-500 text-white' : 'text-gray-400'}`}>
+          ➕ Adicionais
         </button>
-        <button 
-          onClick={() => setActiveTab('settings')} 
-          className={`flex-1 py-2 rounded-lg transition ${activeTab === 'settings' ? 'bg-orange-500 text-white' : 'text-gray-400'}`}>
-          ⚙️ Loja
+        <button onClick={() => setActiveTab('neighborhoods')} className={`flex-1 py-2 px-2 rounded-lg whitespace-nowrap ${activeTab === 'neighborhoods' ? 'bg-orange-500 text-white' : 'text-gray-400'}`}>
+          🛵 Bairros
         </button>
       </div>
 
@@ -237,6 +233,38 @@ export default function Admin() {
                 className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
                 onChange={(e) => setNewProd({ ...newProd, image: e.target.value })}
               />
+
+              {/* SELETOR DE ADICIONAIS GLOBAIS */}
+              {globalAddons.length > 0 && (
+                <div className="border-t border-gray-800 pt-2">
+                  <label className="text-[11px] text-gray-400 block mb-1">Selecione os Adicionais deste Lanche:</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {globalAddons.map(a => {
+                      const formattedStr = `${a.name}:${a.price}`;
+                      const isSelected = newProd.addons_list.includes(a.name);
+                      return (
+                        <label key={a.id} className="flex items-center space-x-1.5 bg-gray-800 p-2 rounded text-[11px] cursor-pointer">
+                          <input 
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              let currentArr = newProd.addons_list ? newProd.addons_list.split(',').filter(Boolean) : [];
+                              if (e.target.checked) {
+                                currentArr.push(formattedStr);
+                              } else {
+                                currentArr = currentArr.filter(item => !item.startsWith(a.name));
+                              }
+                              setNewProd({ ...newProd, addons_list: currentArr.join(',') });
+                            }}
+                          />
+                          <span className="truncate">{a.name} (+R${Number(a.price).toFixed(2)})</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <button type="submit" className="w-full bg-green-600 font-bold py-2.5 rounded-lg text-xs">
                 Salvar Lanche 🚀
               </button>
@@ -280,9 +308,7 @@ export default function Admin() {
                 className="flex-1 bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
                 onChange={(e) => setNewCatName(e.target.value)}
               />
-              <button type="submit" className="bg-green-600 font-bold px-4 py-2.5 rounded-lg text-xs">
-                Adicionar
-              </button>
+              <button type="submit" className="bg-green-600 font-bold px-4 py-2.5 rounded-lg text-xs">Adicionar</button>
             </form>
           </section>
 
@@ -298,11 +324,48 @@ export default function Admin() {
         </div>
       )}
 
-      {/* ABA 3: BAIRROS E TAXAS */}
+      {/* ABA 3: ADICIONAIS GLOBAIS */}
+      {activeTab === 'addons' && (
+        <div className="space-y-6">
+          <section className="bg-gray-900 p-4 rounded-xl border border-gray-800 space-y-3">
+            <h3 className="font-bold text-sm text-orange-400">➕ Novo Adicional</h3>
+            <form onSubmit={handleAddGlobalAddon} className="space-y-3">
+              <input 
+                type="text" placeholder="Nome do Adicional (Ex: Bacon Extra, Pão Brioche)" value={newAddon.name}
+                className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
+                onChange={(e) => setNewAddon({ ...newAddon, name: e.target.value })}
+              />
+              <input 
+                type="number" step="0.01" placeholder="Valor Adicional R$ (Ex: 4.50)" value={newAddon.price}
+                className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
+                onChange={(e) => setNewAddon({ ...newAddon, price: e.target.value })}
+              />
+              <button type="submit" className="w-full bg-green-600 font-bold py-2.5 rounded-lg text-xs">
+                Cadastrar Adicional
+              </button>
+            </form>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="font-bold text-sm text-gray-300">Adicionais Cadastrados</h3>
+            {globalAddons.map((a) => (
+              <div key={a.id} className="bg-gray-900 p-3 rounded-xl border border-gray-800 flex justify-between items-center text-xs">
+                <div>
+                  <span className="font-bold block">{a.name}</span>
+                  <span className="text-orange-400">+ R$ {Number(a.price).toFixed(2)}</span>
+                </div>
+                <button onClick={() => deleteGlobalAddon(a.id)} className="text-red-400 font-bold p-1">🗑</button>
+              </div>
+            ))}
+          </section>
+        </div>
+      )}
+
+      {/* ABA 4: BAIRROS */}
       {activeTab === 'neighborhoods' && (
         <div className="space-y-6">
           <section className="bg-gray-900 p-4 rounded-xl border border-gray-800 space-y-3">
-            <h3 className="font-bold text-sm text-orange-400">🛵 Novo Bairro de Entrega</h3>
+            <h3 className="font-bold text-sm text-orange-400">🛵 Novo Bairro</h3>
             <form onSubmit={handleAddNeighborhood} className="space-y-3">
               <input 
                 type="text" placeholder="Nome do Bairro (Ex: Cordeiros)" value={newNeigh.name}
@@ -310,7 +373,7 @@ export default function Admin() {
                 onChange={(e) => setNewNeigh({ ...newNeigh, name: e.target.value })}
               />
               <input 
-                type="number" step="0.01" placeholder="Taxa de Entrega R$ (Ex: 5.00)" value={newNeigh.fee}
+                type="number" step="0.01" placeholder="Taxa R$ (Ex: 5.00)" value={newNeigh.fee}
                 className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
                 onChange={(e) => setNewNeigh({ ...newNeigh, fee: e.target.value })}
               />
@@ -333,32 +396,6 @@ export default function Admin() {
             ))}
           </section>
         </div>
-      )}
-
-      {/* ABA 4: CONFIGURAÇÕES DA LOJA */}
-      {activeTab === 'settings' && tenant && (
-        <form onSubmit={handleUpdateTenant} className="bg-gray-900 p-4 rounded-xl border border-gray-800 space-y-4">
-          <h3 className="font-bold text-sm text-orange-400">⚙️ Configurações da Hamburgueria</h3>
-          <div>
-            <label className="text-xs text-gray-400 block mb-1">Nome do Estabelecimento:</label>
-            <input 
-              type="text" value={tenant.name}
-              className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white"
-              onChange={(e) => setTenant({ ...tenant, name: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="text-xs text-gray-400 block mb-1">WhatsApp para Receber Pedidos (com DDD):</label>
-            <input 
-              type="text" value={tenant.whatsapp}
-              className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white"
-              onChange={(e) => setTenant({ ...tenant, whatsapp: e.target.value })}
-            />
-          </div>
-          <button type="submit" className="w-full bg-green-600 font-bold py-2.5 rounded-lg text-xs">
-            Salvar Alterações da Loja
-          </button>
-        </form>
       )}
     </div>
   );
