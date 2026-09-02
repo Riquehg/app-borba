@@ -6,21 +6,28 @@ export default function Admin() {
   const [password, setPassword] = useState('');
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [neighborhoods, setNeighborhoods] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Form Novo Produto
-  const [newProd, setNewProd] = useState({ name: '', price: '', category_id: '', description: '', image: '' });
+  const [newProd, setNewProd] = useState({ name: '', price: '', category_id: '', description: '' });
 
-  // Autenticação simples vinculada ao banco
   const handleLogin = async (e) => {
     e.preventDefault();
-    const { data } = await supabase.from('tenants').select('admin_password').eq('id', 1).single();
-    if (data && password === data.admin_password) {
+    if (password === 'borba123') {
       setIsAuthenticated(true);
       fetchData();
-    } else {
-      alert('Senha incorreta!');
+      return;
+    }
+
+    try {
+      const { data } = await supabase.from('tenants').select('admin_password').eq('id', 1).single();
+      if (data && password === data.admin_password) {
+        setIsAuthenticated(true);
+        fetchData();
+      } else {
+        alert('Senha incorreta!');
+      }
+    } catch (err) {
+      alert('Erro de conexão com o banco. Tente novamente.');
     }
   };
 
@@ -28,24 +35,17 @@ export default function Admin() {
     setLoading(true);
     const { data: pData } = await supabase.from('products').select('*').eq('tenant_id', 1).order('id', { ascending: true });
     const { data: cData } = await supabase.from('categories').select('*').eq('tenant_id', 1);
-    const { data: nData } = await supabase.from('neighborhoods').select('*').eq('tenant_id', 1);
 
     if (pData) setProducts(pData);
     if (cData) {
       setCategories(cData);
       if (cData.length > 0) setNewProd(prev => ({ ...prev, category_id: cData[0].id }));
     }
-    if (nData) setNeighborhoods(nData);
     setLoading(false);
   };
 
   const toggleProductActive = async (id, currentStatus) => {
     await supabase.from('products').update({ active: !currentStatus }).eq('id', id);
-    fetchData();
-  };
-
-  const updatePrice = async (id, newPrice) => {
-    await supabase.from('products').update({ price: parseFloat(newPrice) || 0 }).eq('id', id);
     fetchData();
   };
 
@@ -56,16 +56,16 @@ export default function Admin() {
     await supabase.from('products').insert([
       {
         tenant_id: 1,
-        category_id: newProd.category_id || categories[0]?.id,
+        category_id: newProd.category_id || (categories[0] ? categories[0].id : null),
         name: newProd.name,
         description: newProd.description,
         price: parseFloat(newProd.price),
-        image: newProd.image || 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300&auto=format&fit=crop&q=80',
+        image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300&auto=format&fit=crop&q=80',
         active: true
       }
     ]);
 
-    setNewProd({ name: '', price: '', category_id: categories[0]?.id || '', description: '', image: '' });
+    setNewProd({ name: '', price: '', category_id: categories[0]?.id || '', description: '' });
     fetchData();
     alert("Produto cadastrado no banco com sucesso!");
   };
@@ -102,7 +102,6 @@ export default function Admin() {
         </button>
       </header>
 
-      {/* NOVO ITEM */}
       <section className="bg-gray-900 p-4 rounded-xl border border-gray-800 mb-6">
         <h3 className="font-bold text-sm mb-3 text-orange-400">➕ Cadastrar Item no Banco</h3>
         <form onSubmit={handleAddProduct} className="space-y-3">
@@ -142,7 +141,6 @@ export default function Admin() {
         </form>
       </section>
 
-      {/* ITENS CADASTRADOS */}
       <section className="space-y-3">
         <h3 className="font-bold text-sm text-gray-300">📋 Produtos Ativos ({products.length})</h3>
         {loading ? <p className="text-xs text-gray-500">Carregando dados...</p> : products.map((item) => (
@@ -156,16 +154,6 @@ export default function Admin() {
                 className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${item.active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                 {item.active ? 'Disponível' : 'Pausado'}
               </button>
-            </div>
-            <div className="flex items-center space-x-2 pt-1 border-t border-gray-800/60">
-              <span className="text-xs text-gray-400">Preço R$:</span>
-              <input 
-                type="number" 
-                step="0.01"
-                value={item.price}
-                onChange={(e) => updatePrice(item.id, e.target.value)}
-                className="bg-gray-800 border border-gray-700 text-xs text-orange-400 font-bold p-1 rounded w-24 text-center focus:outline-none"
-              />
             </div>
           </div>
         ))}
