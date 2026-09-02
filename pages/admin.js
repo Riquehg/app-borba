@@ -15,7 +15,7 @@ export default function Admin() {
 
   // States dos formulários
   const [newProd, setNewProd] = useState({ name: '', price: '', category_id: '', description: '', image: '', addons_list: '' });
-  const [editingProduct, setEditingProduct] = useState(null); // Item em edição
+  const [editingProduct, setEditingProduct] = useState(null);
   const [newCatName, setNewCatName] = useState('');
   const [newAddon, setNewAddon] = useState({ name: '', price: '' });
   const [newNeigh, setNewNeigh] = useState({ name: '', fee: '' });
@@ -51,7 +51,7 @@ export default function Admin() {
     if (tData) setTenant(tData);
     if (cData) {
       setCategories(cData);
-      if (cData.length > 0 && !newProd.category_id) {
+      if (cData.length > 0) {
         setNewProd(prev => ({ ...prev, category_id: cData[0].id }));
       }
     }
@@ -61,7 +61,7 @@ export default function Admin() {
     setLoading(false);
   };
 
-  // --- AÇÕES DE PRODUTO (CRIAR / EDITAR / DELETAR) ---
+  // PRODUTOS
   const handleAddProduct = async (e) => {
     e.preventDefault();
     if (!newProd.name || !newProd.price) return alert("Preencha o nome e o preço!");
@@ -104,7 +104,7 @@ export default function Admin() {
     }).eq('id', editingProduct.id);
 
     if (error) {
-      alert("Erro ao atualizar produto: " + error.message);
+      alert("Erro ao atualizar: " + error.message);
     } else {
       setEditingProduct(null);
       fetchData();
@@ -124,7 +124,7 @@ export default function Admin() {
     }
   };
 
-  // --- AÇÕES DE CATEGORIA ---
+  // CATEGORIAS
   const handleAddCategory = async (e) => {
     e.preventDefault();
     if (!newCatName.trim()) return alert("Digite o nome da categoria!");
@@ -146,7 +146,7 @@ export default function Admin() {
     }
   };
 
-  // --- AÇÕES DE ADICIONAIS GLOBAIS ---
+  // ADICIONAIS GLOBAIS
   const handleAddGlobalAddon = async (e) => {
     e.preventDefault();
     if (!newAddon.name || newAddon.price === '') return alert("Preencha nome e preço do adicional!");
@@ -171,10 +171,10 @@ export default function Admin() {
     }
   };
 
-  // --- AÇÕES DE BAIRRO ---
+  // BAIRROS
   const handleAddNeighborhood = async (e) => {
     e.preventDefault();
-    if (!newNeigh.name || newNeigh.fee === '') return alert("Preencha o nome do bairro e a taxa!");
+    if (!newNeigh.name || newNeigh.fee === '') return alert("Preencha bairro e taxa!");
     await supabase.from('neighborhoods').insert([{
       tenant_id: 1, name: newNeigh.name.trim(), fee: parseFloat(newNeigh.fee)
     }]);
@@ -237,7 +237,7 @@ export default function Admin() {
         </button>
       </div>
 
-      {/* ABA 1: PRODUTOS */}
+      {/* ABA PRODUTOS */}
       {activeTab === 'products' && (
         <div className="space-y-6">
           <section className="bg-gray-900 p-4 rounded-xl border border-gray-800 space-y-3">
@@ -308,7 +308,6 @@ export default function Admin() {
             </form>
           </section>
 
-          {/* LISTA DE PRODUTOS CADASTRADOS */}
           <section className="space-y-2">
             <h3 className="font-bold text-sm text-gray-300">📋 Produtos ({products.length})</h3>
             {products.map((item) => (
@@ -410,7 +409,7 @@ export default function Admin() {
         </div>
       )}
 
-      {/* ABA 2: CATEGORIAS */}
+      {/* ABA CATEGORIAS */}
       {activeTab === 'categories' && (
         <div className="space-y-6">
           <section className="bg-gray-900 p-4 rounded-xl border border-gray-800 space-y-3">
@@ -437,7 +436,7 @@ export default function Admin() {
         </div>
       )}
 
-      {/* ABA 3: ADICIONAIS GLOBAIS */}
+      {/* ABA ADICIONAIS GLOBAIS */}
       {activeTab === 'addons' && (
         <div className="space-y-6">
           <section className="bg-gray-900 p-4 rounded-xl border border-gray-800 space-y-3">
@@ -474,7 +473,7 @@ export default function Admin() {
         </div>
       )}
 
-      {/* ABA 4: BAIRROS */}
+      {/* ABA BAIRROS */}
       {activeTab === 'neighborhoods' && (
         <div className="space-y-6">
           <section className="bg-gray-900 p-4 rounded-xl border border-gray-800 space-y-3">
