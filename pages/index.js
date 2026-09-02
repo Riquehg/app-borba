@@ -23,7 +23,7 @@ export default function Home() {
   // Modal State
   const [activeModalProduct, setActiveModalProduct] = useState(null);
   const [selectedAddons, setSelectedAddons] = useState([]);
-  const [removedIngredients, setRemovedIngredients] = useState([]);
+  const [itemObservation, setItemObservation] = useState("");
 
   useEffect(() => {
     async function loadData() {
@@ -41,13 +41,12 @@ export default function Home() {
           setSelectedNeighborhood(nData[0]);
         }
       } catch (e) {
-        console.log("Erro ao carregar do banco");
+        console.log("Erro de dados");
       }
     }
     loadData();
   }, []);
 
-  // FILTRO CORRIGIDO POR ID DA CATEGORIA
   const filteredProducts = selectedCategoryId === "all"
     ? products
     : products.filter(p => p.category_id === selectedCategoryId);
@@ -55,24 +54,15 @@ export default function Home() {
   const openProductModal = (product) => {
     setActiveModalProduct(product);
     setSelectedAddons([]);
-    setRemovedIngredients([]);
+    setItemObservation("");
   };
 
   const parseAddons = (str) => {
-    if (!str) return [
-      { name: 'Bacon Extra', price: 4.50 },
-      { name: 'Cheddar Extra', price: 3.50 },
-      { name: 'Hambúrguer Extra 160g', price: 8.00 }
-    ];
+    if (!str) return [];
     return str.split(',').map(item => {
       const [name, price] = item.split(':');
       return { name: name?.trim(), price: parseFloat(price) || 0 };
     });
-  };
-
-  const parseRemovals = (str) => {
-    if (!str) return ['Sem Cebola', 'Sem Tomate', 'Sem Maionese'];
-    return str.split(',').map(item => item.trim());
   };
 
   const toggleAddon = (addon) => {
@@ -83,21 +73,13 @@ export default function Home() {
     }
   };
 
-  const toggleRemoval = (ing) => {
-    if (removedIngredients.includes(ing)) {
-      setRemovedIngredients(removedIngredients.filter(i => i !== ing));
-    } else {
-      setRemovedIngredients([...removedIngredients, ing]);
-    }
-  };
-
   const confirmCustomProduct = () => {
     const addonsTotal = selectedAddons.reduce((sum, a) => sum + a.price, 0);
     const finalPrice = Number(activeModalProduct.price) + addonsTotal;
 
     let detailsArr = [];
     if (selectedAddons.length > 0) detailsArr.push(`Add: ${selectedAddons.map(a => a.name).join(', ')}`);
-    if (removedIngredients.length > 0) detailsArr.push(`Sem: ${removedIngredients.join(', ')}`);
+    if (itemObservation.trim()) detailsArr.push(`Obs: ${itemObservation.trim()}`);
 
     setCart([...cart, {
       ...activeModalProduct,
@@ -140,8 +122,7 @@ ${itemsSummary}
 *Subtotal:* R$ ${calculateSubtotal().toFixed(2)}
 *Taxa (${selectedNeighborhood?.name}):* R$ ${Number(selectedNeighborhood?.fee || 0).toFixed(2)}
 *TOTAL DO PEDIDO:* R$ ${calculateTotal()}
-----------------------------------
-*Obs:* ${customer.notes || 'Nenhuma'}`;
+----------------------------------`;
 
     window.open(`https://wa.me/${tenant.whatsapp}?text=${encodeURIComponent(message)}`, '_blank');
   };
@@ -161,8 +142,8 @@ ${itemsSummary}
         <p className="text-xs text-gray-400 mt-1">Lanches & Petiscos • Entrega Rápida</p>
       </header>
 
-      {/* BANNER DE CATEGORIAS (FILTRO FUNCIONAL) */}
-      <div className="flex space-x-2 overflow-x-auto p-4 scrollbar-hide">
+      {/* Categorias */}
+      <div className="flex space-x-2 overflow-x-auto p-4">
         {categories.map((cat) => (
           <button
             key={cat.id}
@@ -174,7 +155,7 @@ ${itemsSummary}
         ))}
       </div>
 
-      {/* LISTA DE PRODUTOS */}
+      {/* Lista de Produtos */}
       <div className="px-4 space-y-4">
         {filteredProducts.map((item) => (
           <div key={item.id} className="bg-gray-900 p-3 rounded-xl flex space-x-3 items-center border border-gray-800">
@@ -198,53 +179,50 @@ ${itemsSummary}
         ))}
       </div>
 
-      {/* MODAL DE PERSONALIZAÇÃO */}
+      {/* MODAL DE PERSONALIZAÇÃO COM OBSERVAÇÃO */}
       {activeModalProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-end justify-center z-50 p-0">
           <div className="bg-gray-900 w-full max-w-md rounded-t-2xl p-5 border-t border-gray-700 max-h-[85vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h3 className="font-bold text-lg">{activeModalProduct.name}</h3>
-                <p className="text-xs text-gray-400">Personalize seu lanche abaixo</p>
+                <p className="text-xs text-gray-400">Personalize seu pedido</p>
               </div>
               <button onClick={() => setActiveModalProduct(null)} className="text-gray-400 font-bold text-lg">✕</button>
             </div>
 
             {/* Adicionais */}
-            <div className="mb-4">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-orange-400 mb-2">Deseja Adicionais?</h4>
-              <div className="space-y-1.5">
-                {parseAddons(activeModalProduct.addons_list).map((add) => (
-                  <label key={add.name} className="flex justify-between items-center bg-gray-800 p-2.5 rounded-lg text-xs cursor-pointer">
-                    <div className="flex items-center space-x-2">
-                      <input 
-                        type="checkbox" 
-                        checked={!!selectedAddons.find(a => a.name === add.name)}
-                        onChange={() => toggleAddon(add)}
-                      />
-                      <span>{add.name}</span>
-                    </div>
-                    <span className="text-orange-400 font-bold">+ R$ {add.price.toFixed(2)}</span>
-                  </label>
-                ))}
+            {parseAddons(activeModalProduct.addons_list).length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-orange-400 mb-2">Deseja Adicionais?</h4>
+                <div className="space-y-1.5">
+                  {parseAddons(activeModalProduct.addons_list).map((add) => (
+                    <label key={add.name} className="flex justify-between items-center bg-gray-800 p-2.5 rounded-lg text-xs cursor-pointer">
+                      <div className="flex items-center space-x-2">
+                        <input 
+                          type="checkbox" 
+                          checked={!!selectedAddons.find(a => a.name === add.name)}
+                          onChange={() => toggleAddon(add)}
+                        />
+                        <span>{add.name}</span>
+                      </div>
+                      <span className="text-orange-400 font-bold">+ R$ {add.price.toFixed(2)}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Remoções */}
+            {/* CAMPO DE OBSERVAÇÃO LIVRE */}
             <div className="mb-6">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-orange-400 mb-2">Retirar Ingredientes</h4>
-              <div className="grid grid-cols-2 gap-2">
-                {parseRemovals(activeModalProduct.removals_list).map((ing) => (
-                  <label key={ing} className="flex items-center space-x-2 bg-gray-800 p-2.5 rounded-lg text-xs cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={removedIngredients.includes(ing)}
-                      onChange={() => toggleRemoval(ing)}
-                    />
-                    <span>{ing}</span>
-                  </label>
-                ))}
-              </div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-orange-400 mb-2">Observações do Lanche:</h4>
+              <textarea 
+                placeholder="Ex: Tirar salada, carne bem passada, sem maionese..."
+                rows="3"
+                value={itemObservation}
+                onChange={(e) => setItemObservation(e.target.value)}
+                className="w-full bg-gray-800 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-none"
+              />
             </div>
 
             <button 
@@ -257,7 +235,7 @@ ${itemsSummary}
         </div>
       )}
 
-      {/* ÁREA DO CARRINHO E CHECKOUT */}
+      {/* ÁREA DO CARRINHO */}
       {cart.length > 0 && (
         <div className="m-4 mt-8 bg-gray-900 p-4 rounded-xl border border-gray-700 shadow-xl space-y-3">
           <h3 className="font-bold text-md border-b border-gray-800 pb-2 flex justify-between">
@@ -278,7 +256,6 @@ ${itemsSummary}
             ))}
           </div>
 
-          {/* Seleção de Bairro / Taxa */}
           {neighborhoods.length > 0 && (
             <div>
               <label className="text-[11px] text-gray-400 block mb-1">Selecione seu Bairro (Taxa de Entrega):</label>
@@ -294,7 +271,6 @@ ${itemsSummary}
             </div>
           )}
 
-          {/* Forma de Pagamento */}
           <div>
             <label className="text-[11px] text-gray-400 block mb-1">Forma de Pagamento:</label>
             <select 
