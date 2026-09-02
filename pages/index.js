@@ -1,66 +1,65 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
+const defaultTenant = {
+  name: "Borba Cordeiros",
+  whatsapp: "5547999999999",
+  primary_color: "#FF8C00",
+  logo_url: "https://images.unsplash.com/photo-1550547660-d9450f859349?w=150&auto=format&fit=crop&q=80",
+  banner_url: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80"
+};
+
+const defaultProducts = [
+  {
+    id: 1,
+    name: "X-Salada Especial Borba",
+    description: "Pão brioche, hambúrguer artesanal 160g, queijo cheddar, alface, tomate e maionese da casa.",
+    price: 24.90,
+    image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300&auto=format&fit=crop&q=80"
+  },
+  {
+    id: 2,
+    name: "Porção de Batata com Cheddar e Bacon",
+    description: "500g de batata frita crocante coberta com molho cheddar e bacon em cubos.",
+    price: 38.00,
+    image: "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=300&auto=format&fit=crop&q=80"
+  }
+];
+
 export default function Home() {
-  const [tenant, setTenant] = useState(null);
-  const [categories, setCategories] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [neighborhoods, setNeighborhoods] = useState([]);
-  
+  const [tenant, setTenant] = useState(defaultTenant);
+  const [categories, setCategories] = useState([{ id: 'all', name: 'Todos' }, { id: 1, name: 'Hambúrgueres' }, { id: 2, name: 'Porções' }]);
+  const [products, setProducts] = useState(defaultProducts);
   const [selectedCategory, setSelectedCategory] = useState("Todos");
   const [cart, setCart] = useState([]);
-  const [selectedNeighborhood, setSelectedNeighborhood] = useState(null);
-  const [customer, setCustomer] = useState({ name: '', address: '', payment: 'PIX', notes: '' });
+  const [customer, setCustomer] = useState({ name: '', address: '', payment: 'PIX' });
 
   useEffect(() => {
-    async function loadStoreData() {
-      // Puxa dados da Borba Cordeiros (ID: 1)
-      const { data: tData } = await supabase.from('tenants').select('*').eq('id', 1).single();
-      const { data: cData } = await supabase.from('categories').select('*').eq('tenant_id', 1);
-      const { data: pData } = await supabase.from('products').select('*').eq('tenant_id', 1).eq('active', true);
-      const { data: nData } = await supabase.from('neighborhoods').select('*').eq('tenant_id', 1);
+    async function loadData() {
+      try {
+        const { data: tData } = await supabase.from('tenants').select('*').eq('id', 1).single();
+        const { data: pData } = await supabase.from('products').select('*').eq('tenant_id', 1).eq('active', true);
+        const { data: cData } = await supabase.from('categories').select('*').eq('tenant_id', 1);
 
-      if (tData) setTenant(tData);
-      if (cData) setCategories([{ id: 'all', name: 'Todos' }, ...cData]);
-      if (pData) setProducts(pData);
-      if (nData) {
-        setNeighborhoods(nData);
-        setSelectedNeighborhood(nData[0]);
+        if (tData) setTenant(tData);
+        if (pData && pData.length > 0) setProducts(pData);
+        if (cData && cData.length > 0) setCategories([{ id: 'all', name: 'Todos' }, ...cData]);
+      } catch (e) {
+        console.log("Carregando com dados padrão");
       }
     }
-    loadStoreData();
+    loadData();
   }, []);
 
-  if (!tenant) {
-    return (
-      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center font-sans">
-        <p className="text-xs text-gray-400">Carregando Cardápio...</p>
-      </div>
-    );
-  }
-
-  const filteredProducts = selectedCategory === "Todos"
-    ? products
-    : products.filter(p => {
-        const catObj = categories.find(c => c.name === selectedCategory);
-        return catObj ? p.category_id === catObj.id : true;
-      });
-
   const addToCart = (product) => {
-    setCart([...cart, { ...product, cartId: Date.now(), finalPrice: product.price }]);
+    setCart([...cart, { ...product, cartId: Date.now(), finalPrice: Number(product.price) }]);
   };
 
   const removeFromCart = (cartId) => {
     setCart(cart.filter(item => item.cartId !== cartId));
   };
 
-  const calculateSubtotal = () => cart.reduce((sum, item) => sum + item.finalPrice, 0);
-  const calculateTotal = () => (calculateSubtotal() + (selectedNeighborhood?.fee || 0)).toFixed(2);
-
-  const scrollToCheckout = () => {
-    const el = document.getElementById("checkout-section");
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
-  };
+  const calculateTotal = () => cart.reduce((sum, item) => sum + item.finalPrice, 0).toFixed(2);
 
   const sendOrderToWhatsApp = () => {
     if (cart.length === 0) return alert("Seu carrinho está vazio!");
@@ -72,24 +71,20 @@ export default function Home() {
 `*NOVO PEDIDO - ${tenant.name.toUpperCase()}* 🍔
 ----------------------------------
 *Cliente:* ${customer.name}
-*Endereço:* ${customer.address} (${selectedNeighborhood?.name})
+*Endereço:* ${customer.address}
 *Pagamento:* ${customer.payment}
 
 *ITENS DO PEDIDO:*
 ${itemsSummary}
 
-----------------------------------
-*Subtotal:* R$ ${calculateSubtotal().toFixed(2)}
-*Taxa (${selectedNeighborhood?.name}):* R$ ${selectedNeighborhood?.fee.toFixed(2)}
 *TOTAL:* R$ ${calculateTotal()}
-----------------------------------
-*Obs:* ${customer.notes || 'Nenhuma'}`;
+----------------------------------`;
 
     window.open(`https://wa.me/${tenant.whatsapp}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
   return (
-    <div style={{ backgroundColor: tenant.primary_color ? '#121212' : '#121212', color: '#FFFFFF' }} className="min-h-screen max-w-md mx-auto font-sans pb-24">
+    <div className="min-h-screen max-w-md mx-auto font-sans pb-24 bg-gray-950 text-white">
       {/* Header */}
       <div className="relative">
         <img src={tenant.banner_url} alt="Banner" className="w-full h-36 object-cover" />
@@ -118,7 +113,7 @@ ${itemsSummary}
 
       {/* Produtos */}
       <div className="px-4 space-y-4">
-        {filteredProducts.map((item) => (
+        {products.map((item) => (
           <div key={item.id} className="bg-gray-900 p-3 rounded-xl flex space-x-3 items-center border border-gray-800">
             <img src={item.image} alt={item.name} className="w-20 h-20 rounded-lg object-cover flex-shrink-0" />
             <div className="flex-1">
@@ -140,9 +135,9 @@ ${itemsSummary}
         ))}
       </div>
 
-      {/* Checkout e Rodapé mantidos conforme projeto... */}
+      {/* Carrinho */}
       {cart.length > 0 && (
-        <div id="checkout-section" className="m-4 mt-8 bg-gray-900 p-4 rounded-xl border border-gray-700 shadow-xl">
+        <div className="m-4 mt-8 bg-gray-900 p-4 rounded-xl border border-gray-700 shadow-xl">
           <h3 className="font-bold text-md mb-3 border-b border-gray-800 pb-2 flex justify-between">
             <span>🛒 Seu Carrinho</span>
             <span className="text-xs text-gray-400">{cart.length} itens</span>
@@ -159,14 +154,6 @@ ${itemsSummary}
             ))}
           </div>
 
-          <select 
-            className="w-full bg-gray-800 text-white p-2 rounded text-xs mb-2"
-            onChange={(e) => setSelectedNeighborhood(neighborhoods[e.target.value])}>
-            {neighborhoods.map((n, i) => (
-              <option key={n.id} value={i}>{n.name} (+ R$ {Number(n.fee).toFixed(2)})</option>
-            ))}
-          </select>
-
           <input 
             placeholder="Seu Nome" 
             className="w-full bg-gray-800 text-white p-2 rounded text-xs mb-2" 
@@ -180,15 +167,6 @@ ${itemsSummary}
 
           <button onClick={sendOrderToWhatsApp} className="w-full py-3 bg-green-600 font-bold rounded-xl text-xs">
             Enviar Pedido pelo WhatsApp 🚀
-          </button>
-        </div>
-      )}
-
-      {cart.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 p-3 max-w-md mx-auto">
-          <button onClick={scrollToCheckout} className="w-full bg-green-600 font-bold p-3 rounded-xl flex justify-between text-xs">
-            <span>Ver Carrinho ({cart.length})</span>
-            <span>R$ {calculateTotal()} ➔</span>
           </button>
         </div>
       )}
