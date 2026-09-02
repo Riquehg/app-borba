@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 const clientConfig = {
   name: "Borba Cordeiros",
   logo: "https://scontent.fnvt1-1.fna.fbcdn.net/v/t39.30808-6/708304749_27798913923043979_7133591830455552075_n.jpg?stp=dst-jpg_tt6&cstp=mx2048x2048&ctp=s2048x2048&_nc_cat=109&ccb=1-7&_nc_sid=6ee11a&_nc_eui2=AeFGyJgcvZZ1omha0ysPAfgCJktJfqUAHgUmS0l-pQAeBbhZe5tqsBo4I0i9RLGSKgeIkzEHnteUjIF7_VbOSYyg&_nc_ohc=I4NUKhgcquwQ7kNvwEprmIf&_nc_oc=AdoNNFmTtLfRghCaOHDIh3biygsZCILS5ZrYXy8UvQfACfKZwf23S5TIxpnmFV37JMsAFJrwqgKOuLwUc2WJrxYd&_nc_zt=23&_nc_ht=scontent.fnvt1-1.fna&_nc_gid=pZX2lDHTiRWKaBvTjHfVSQ&_nc_ss=7b2a8&oh=00_AQKjPW2gf1zkUEHGnxaTPR2CvjMDNMz7hiPX-mBq2J4CiA&oe=6A9E2ED7", // Substituir pelo logo real
-  banner: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80", // Substituir pelo banner real
+  banner: "https://storage.googleapis.com/prod-cardapio-web/uploads/company/image/34208/54f8b26fWhatsApp_Image_2026-06-05_at_10.27.33.jpeg", // Substituir pelo banner real
   whatsapp: "5547999999999", // Insira o WhatsApp da loja
   primaryColor: "#FF8C00",
   backgroundColor: "#121212",
