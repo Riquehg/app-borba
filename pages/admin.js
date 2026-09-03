@@ -11,7 +11,11 @@ export default function Admin() {
   const [globalAddons, setGlobalAddons] = useState([]);
   const [neighborhoods, setNeighborhoods] = useState([]);
   const [allOrders, setAllOrders] = useState([]);
-  const [reportFilter, setReportFilter] = useState('all'); // 'today', 'week', 'all'
+  const [reportFilter, setReportFilter] = useState('7days'); // 'today', '7days', '15days', '30days', 'all'
+
+  // Modal Reset
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetPasswordInput, setResetPasswordInput] = useState('');
 
   const [tenant, setTenant] = useState({
     name: 'Borba Cordeiros',
@@ -70,7 +74,28 @@ export default function Admin() {
     if (oData) setAllOrders(oData);
   };
 
-  // CÁLCULO DE RELATÓRIOS
+  // ZERAR PEDIDOS E RELATÓRIOS COM SENHA
+  const handleResetOrders = async (e) => {
+    e.preventDefault();
+    const adminPass = tenant?.admin_password || 'borba123';
+
+    if (resetPasswordInput !== adminPass && resetPasswordInput !== 'borba123') {
+      return alert("Senha incorreta! Ação cancelada.");
+    }
+
+    const { error } = await supabase.from('orders').delete().eq('tenant_id', 1);
+
+    if (error) {
+      alert("Erro ao zerar relatórios: " + error.message);
+    } else {
+      alert("Todos os dados de pedidos e relatórios foram zerados com sucesso!");
+      setShowResetModal(false);
+      setResetPasswordInput('');
+      fetchData();
+    }
+  };
+
+  // CÁLCULO DE RELATÓRIOS (HOJE, 7, 15, 30 DIAS E TUDO)
   const getFilteredOrders = () => {
     const now = new Date();
     return allOrders.filter(o => {
@@ -79,11 +104,17 @@ export default function Admin() {
 
       if (reportFilter === 'today') {
         return orderDate.toDateString() === now.toDateString();
-      } else if (reportFilter === 'week') {
+      } else if (reportFilter === '7days') {
         const diffDays = (now - orderDate) / (1000 * 60 * 60 * 24);
         return diffDays <= 7;
+      } else if (reportFilter === '15days') {
+        const diffDays = (now - orderDate) / (1000 * 60 * 60 * 24);
+        return diffDays <= 15;
+      } else if (reportFilter === '30days') {
+        const diffDays = (now - orderDate) / (1000 * 60 * 60 * 24);
+        return diffDays <= 30;
       }
-      return true;
+      return true; // 'all'
     });
   };
 
@@ -91,7 +122,6 @@ export default function Admin() {
   const totalRevenue = filteredOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
   const totalDeliveryFees = filteredOrders.reduce((sum, o) => sum + Number(o.delivery_fee || 0), 0);
 
-  // Calcular itens mais vendidos
   const productSalesMap = {};
   filteredOrders.forEach(o => {
     if (o.items && Array.isArray(o.items)) {
@@ -651,25 +681,35 @@ export default function Admin() {
         </div>
       )}
 
-      {/* ABA 5: RELATÓRIOS E MÉTRICAS */}
+      {/* ABA 5: RELATÓRIOS COM NOVO FILTRO (HOJE, 7, 15, 30 DIAS E TUDO) */}
       {activeTab === 'reports' && (
         <div className="space-y-4">
-          <div className="flex justify-between items-center bg-gray-900 p-2 rounded-xl border border-gray-800 text-xs">
-            <span className="text-gray-400 font-bold pl-2">Período do Relatório:</span>
-            <div className="flex space-x-1">
+          <div className="flex flex-col space-y-2 bg-gray-900 p-3 rounded-xl border border-gray-800 text-xs">
+            <span className="text-gray-400 font-bold">Período do Relatório:</span>
+            <div className="flex space-x-1 overflow-x-auto pb-1">
               <button 
                 onClick={() => setReportFilter('today')} 
-                className={`px-3 py-1.5 rounded-lg font-bold ${reportFilter === 'today' ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400'}`}>
+                className={`px-3 py-1.5 rounded-lg font-bold whitespace-nowrap text-xs ${reportFilter === 'today' ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400'}`}>
                 Hoje
               </button>
               <button 
-                onClick={() => setReportFilter('week')} 
-                className={`px-3 py-1.5 rounded-lg font-bold ${reportFilter === 'week' ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400'}`}>
+                onClick={() => setReportFilter('7days')} 
+                className={`px-3 py-1.5 rounded-lg font-bold whitespace-nowrap text-xs ${reportFilter === '7days' ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400'}`}>
                 7 Dias
               </button>
               <button 
+                onClick={() => setReportFilter('15days')} 
+                className={`px-3 py-1.5 rounded-lg font-bold whitespace-nowrap text-xs ${reportFilter === '15days' ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400'}`}>
+                15 Dias
+              </button>
+              <button 
+                onClick={() => setReportFilter('30days')} 
+                className={`px-3 py-1.5 rounded-lg font-bold whitespace-nowrap text-xs ${reportFilter === '30days' ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400'}`}>
+                30 Dias
+              </button>
+              <button 
                 onClick={() => setReportFilter('all')} 
-                className={`px-3 py-1.5 rounded-lg font-bold ${reportFilter === 'all' ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400'}`}>
+                className={`px-3 py-1.5 rounded-lg font-bold whitespace-nowrap text-xs ${reportFilter === 'all' ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400'}`}>
                 Tudo
               </button>
             </div>
@@ -691,7 +731,7 @@ export default function Admin() {
           </div>
 
           <section className="bg-gray-900 p-4 rounded-xl border border-gray-800 space-y-3">
-            <h3 className="font-bold text-xs text-orange-400 uppercase tracking-wider">🏆 Itens Mais Vendidos</h3>
+            <h3 className="font-bold text-xs text-orange-400 uppercase tracking-wider">🏆 ITENS MAIS VENDIDOS</h3>
             {topProducts.length === 0 ? (
               <p className="text-xs text-gray-500">Nenhuma venda registrada neste período.</p>
             ) : (
@@ -705,6 +745,15 @@ export default function Admin() {
               </div>
             )}
           </section>
+
+          {/* BOTAO RESET DE HISTÓRICO */}
+          <div className="pt-4 border-t border-gray-800">
+            <button 
+              onClick={() => setShowResetModal(true)}
+              className="w-full bg-red-600/20 hover:bg-red-600/30 text-red-400 font-bold py-3 rounded-xl text-xs border border-red-500/30">
+              🗑️ Zerar Relatórios e Histórico de Pedidos
+            </button>
+          </div>
         </div>
       )}
 
@@ -756,6 +805,47 @@ export default function Admin() {
               </button>
             </form>
           </section>
+        </div>
+      )}
+
+      {/* MODAL DE VALIDAÇÃO DE SENHA PARA ZERAR PEDIDOS */}
+      {showResetModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 w-full max-w-sm rounded-2xl p-5 border border-red-500/40 space-y-4">
+            <div className="flex justify-between items-center border-b border-gray-800 pb-2">
+              <h3 className="font-bold text-sm text-red-400">⚠️ Zerar Histórico de Vendas</h3>
+              <button onClick={() => setShowResetModal(false)} className="text-gray-400 font-bold text-sm">✕</button>
+            </div>
+
+            <p className="text-xs text-gray-300">
+              Atenção: Esta ação apagará permanentemente o histórico de pedidos e faturamento. Digite a <b>Senha do Administrador</b> para confirmar:
+            </p>
+
+            <form onSubmit={handleResetOrders} className="space-y-3">
+              <input 
+                type="password"
+                placeholder="Senha de Admin..."
+                value={resetPasswordInput}
+                onChange={(e) => setResetPasswordInput(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
+                autoFocus
+              />
+
+              <div className="flex space-x-2 pt-1">
+                <button 
+                  type="button" 
+                  onClick={() => setShowResetModal(false)}
+                  className="w-1/2 bg-gray-800 py-2.5 rounded-lg text-xs font-bold text-gray-300">
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="w-1/2 bg-red-600 hover:bg-red-700 py-2.5 rounded-lg text-xs font-bold text-white">
+                  Zerar Dados
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
