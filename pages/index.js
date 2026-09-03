@@ -23,6 +23,7 @@ export default function Home() {
   const [selectedNeighborhood, setSelectedNeighborhood] = useState(null);
   const [customer, setCustomer] = useState({
     name: '',
+    phone: '',
     streetAndNumber: '',
     reference: '',
     payment: 'PIX'
@@ -112,6 +113,7 @@ export default function Home() {
   const sendOrderToWhatsApp = async () => {
     if (cart.length === 0) return alert("Seu carrinho está vazio!");
     if (!customer.name.trim()) return alert("Preencha seu Nome Completo!");
+    if (!customer.phone.trim()) return alert("Preencha seu WhatsApp/Telefone!");
 
     if (orderType === 'delivery') {
       if (!selectedNeighborhood) return alert("Selecione o Bairro para entrega!");
@@ -122,6 +124,7 @@ export default function Home() {
 
     const subtotal = calculateSubtotal();
     const total = calculateTotal();
+    const cleanPhone = customer.phone.replace(/\D/g, '');
 
     let createdOrderId = null;
 
@@ -130,6 +133,7 @@ export default function Home() {
       const { data, error } = await supabase.from('orders').insert([{
         tenant_id: 1,
         customer_name: customer.name.trim(),
+        customer_phone: cleanPhone,
         order_type: orderType,
         neighborhood: orderType === 'delivery' ? selectedNeighborhood?.name : 'Retirada no Balcão',
         address: orderType === 'delivery' ? customer.streetAndNumber.trim() : 'Retirada no Balcão',
@@ -143,17 +147,17 @@ export default function Home() {
       }]).select('id').single();
 
       if (error) {
-        console.error("Erro no Supabase ao salvar pedido:", error);
+        console.error("Erro no Supabase:", error);
       } else if (data) {
         createdOrderId = data.id;
       }
     } catch (err) {
-      console.error("Falha ao enviar registro do pedido:", err);
+      console.error("Falha ao salvar pedido:", err);
     }
 
     setLoadingOrder(false);
 
-    // 2. Formatar e Enviar no WhatsApp
+    // 2. Formatar e Enviar no WhatsApp do Restaurante
     let itemsSummary = cart.map(item => {
       let line = `• 1x ${item.name} (R$ ${item.finalPrice.toFixed(2)})`;
       if (item.details) line += `\n   └ _${item.details}_`;
@@ -162,7 +166,7 @@ export default function Home() {
     
     let addressInfo = orderType === 'delivery' 
       ? `*Tipo:* ENTREGA 🛵\n*Bairro:* ${selectedNeighborhood?.name}\n*Endereço:* ${customer.streetAndNumber}${customer.reference ? `\n*Ref:* ${customer.reference}` : ''}`
-      : `*Tipo:* RETIRADA NO BALCÃO PE🛍️`;
+      : `*Tipo:* RETIRADA NO BALCÃO 🛍️`;
 
     const orderTag = createdOrderId ? `PEDIDO #${createdOrderId}` : `NOVO PEDIDO`;
 
@@ -170,6 +174,7 @@ export default function Home() {
 `*${orderTag} - ${tenant.name.toUpperCase()}* 🍔
 ----------------------------------
 *Cliente:* ${customer.name}
+*Telefone:* ${customer.phone}
 ${addressInfo}
 *Pagamento:* ${customer.payment}
 
@@ -337,6 +342,14 @@ ${itemsSummary}
               value={customer.name}
               className="w-full bg-gray-800 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-none" 
               onChange={(e) => setCustomer({...customer, name: e.target.value})}
+            />
+
+            <input 
+              type="text"
+              placeholder="Seu WhatsApp/Telefone (DDD + Número)" 
+              value={customer.phone}
+              className="w-full bg-gray-800 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-none" 
+              onChange={(e) => setCustomer({...customer, phone: e.target.value})}
             />
 
             {orderType === 'delivery' && (
