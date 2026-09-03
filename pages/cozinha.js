@@ -67,22 +67,25 @@ export default function Cozinha() {
     fetchOrders();
   };
 
+  // TGGLE DE STATUS DE PAGAMENTO (PAGO / PENDENTE)
+  const togglePaymentStatus = async (orderId, currentPaidStatus) => {
+    await supabase.from('orders').update({ is_paid: !currentPaidStatus }).eq('id', orderId);
+    fetchOrders();
+  };
+
   // CONFIRMAÇÃO DE CANCELAMENTO COM SENHA DO ADMIN
   const handleConfirmCancelOrder = async (e) => {
     e.preventDefault();
     if (!cancelingOrder) return;
 
-    // Valida contra a senha fixa ou a cadastrada no tenant
     const adminPass = tenant?.admin_password || 'borba123';
     
     if (cancelPassword !== adminPass && cancelPassword !== 'borba123') {
       return alert("Senha administrativa incorreta!");
     }
 
-    // 1. Atualiza status no banco
     await supabase.from('orders').update({ status: 'cancelado' }).eq('id', cancelingOrder.id);
 
-    // 2. Avisa o cliente no WhatsApp
     const targetPhone = cancelingOrder.customer_phone || tenant?.whatsapp;
     const cancelMsg = `Olá *${cancelingOrder.customer_name}*! Informamos que seu pedido *#${cancelingOrder.id}* na Borba Cordeiros foi *CANCELADO*. Se tiver dúvidas, entre em contato conosco por aqui.`;
 
@@ -113,7 +116,7 @@ export default function Cozinha() {
     window.open(`https://wa.me/${targetPhone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
-  // IMPRESSÃO DE COMANDA TÉRMICA
+  // IMPRESSÃO DE COMANDA TÉRMICA COM ALERTA DE COBRANÇA
   const printOrderReceipt = (order) => {
     const dateStr = new Date(order.created_at).toLocaleString('pt-BR');
     
@@ -134,7 +137,8 @@ export default function Cozinha() {
             .center { text-align: center; }
             .line { border-bottom: 1px dashed #000; margin: 8px 0; }
             .bold { font-weight: bold; }
-            .big { font-size: 16px; }
+            .big { font-size: 15px; }
+            .alert-box { border: 2px solid #000; padding: 4px; text-align: center; font-weight: bold; margin: 6px 0; }
           </style>
         </head>
         <body>
@@ -142,16 +146,20 @@ export default function Cozinha() {
           <div class="center bold big">PEDIDO #${order.id}</div>
           <div class="center">${dateStr}</div>
           <div class="line"></div>
+
+          <div class="alert-box">
+            ${order.is_paid ? '🟢 PEDIDO PAGO (NÃO COBRAR)' : `🔴 COBRAR R$ ${Number(order.total).toFixed(2)}`}
+          </div>
           
           <div><b>Cliente:</b> ${order.customer_name}</div>
           <div><b>Telefone:</b> ${order.customer_phone || 'Não informado'}</div>
-          <div><b>Tipo:</b> ${order.order_type === 'delivery' ? 'ENTREGA 🛵' : 'RETIRADA NO BALCÃO 🛍️'}</div>
+          <div><b>Tipo:</b> ${order.order_type === 'delivery' ? 'ENTREGA 🛵' : 'RETIRADA PE🛍️'}</div>
           ${order.order_type === 'delivery' ? `
             <div><b>Bairro:</b> ${order.neighborhood}</div>
             <div><b>Endereço:</b> ${order.address}</div>
             ${order.reference ? `<div><b>Ref:</b> ${order.reference}</div>` : ''}
           ` : ''}
-          <div><b>Pagamento:</b> ${order.payment_method}</div>
+          <div><b>Forma Pagto:</b> ${order.payment_method}</div>
           
           <div class="line"></div>
           <div class="bold">ITENS DO PEDIDO:</div>
@@ -226,6 +234,19 @@ export default function Cozinha() {
                   <span className="text-[10px] bg-gray-800 px-2 py-0.5 rounded text-gray-300 font-bold">{getTimeAgo(order.created_at)}</span>
                 </div>
 
+                {/* SINALIZADOR DE PAGAMENTO */}
+                <div className="flex justify-between items-center bg-gray-950 p-2 rounded-lg border border-gray-800 text-xs">
+                  <div>
+                    <span className="text-gray-400 text-[10px] block">Pagamento: {order.payment_method}</span>
+                    <span className="font-bold text-white">R$ {Number(order.total).toFixed(2)}</span>
+                  </div>
+                  <button 
+                    onClick={() => togglePaymentStatus(order.id, order.is_paid)}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border ${order.is_paid ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}`}>
+                    {order.is_paid ? '🟢 PAGO' : '🔴 PENDENTE'}
+                  </button>
+                </div>
+
                 <div className="border-t border-b border-gray-800 py-2 space-y-1.5 text-xs">
                   {order.items.map((it, idx) => (
                     <div key={idx}>
@@ -277,6 +298,19 @@ export default function Cozinha() {
                   <span className="text-[10px] bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded font-bold">{getTimeAgo(order.created_at)}</span>
                 </div>
 
+                {/* SINALIZADOR DE PAGAMENTO */}
+                <div className="flex justify-between items-center bg-gray-950 p-2 rounded-lg border border-gray-800 text-xs">
+                  <div>
+                    <span className="text-gray-400 text-[10px] block">Pagamento: {order.payment_method}</span>
+                    <span className="font-bold text-white">R$ {Number(order.total).toFixed(2)}</span>
+                  </div>
+                  <button 
+                    onClick={() => togglePaymentStatus(order.id, order.is_paid)}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border ${order.is_paid ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}`}>
+                    {order.is_paid ? '🟢 PAGO' : '🔴 PENDENTE'}
+                  </button>
+                </div>
+
                 <div className="border-t border-b border-gray-800 py-2 space-y-1.5 text-xs">
                   {order.items.map((it, idx) => (
                     <div key={idx}>
@@ -325,6 +359,9 @@ export default function Cozinha() {
                     <span className="text-green-400 font-bold text-sm block">#{order.id} - {order.customer_name}</span>
                     <span className="text-[11px] text-gray-400">{order.order_type === 'delivery' ? 'A caminho da entrega' : 'Aguardando retirada'}</span>
                   </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${order.is_paid ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                    {order.is_paid ? '🟢 PAGO' : '🔴 PENDENTE'}
+                  </span>
                 </div>
 
                 <div className="flex space-x-2 pt-1">
@@ -346,7 +383,7 @@ export default function Cozinha() {
 
       </div>
 
-      {/* MODAL DE VALIDAÇÃO DE SENHA PARA CANCELAMENTO */}
+      {/* MODAL DE CANCELAMENTO */}
       {cancelingOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 w-full max-w-sm rounded-2xl p-5 border border-red-500/40 space-y-4">
