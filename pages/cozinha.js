@@ -56,7 +56,6 @@ export default function Cozinha() {
     fetchOrders();
   };
 
-  // NOTIFICAR CLIENTE NO NÚMERO DELE
   const notifyCustomerWhatsApp = (order, statusText) => {
     const targetPhone = order.customer_phone || tenant?.whatsapp;
     
@@ -74,13 +73,13 @@ export default function Cozinha() {
     window.open(`https://wa.me/${targetPhone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
-  // IMPRESSÃO DE COMANDA
+  // IMPRESSÃO DE COMANDA COM QUANTIDADES DESTACADAS
   const printOrderReceipt = (order) => {
     const dateStr = new Date(order.created_at).toLocaleString('pt-BR');
     
     let itemsHtml = order.items.map(it => `
-      <div style="margin-bottom: 4px;">
-        <b>• 1x ${it.name}</b>
+      <div style="margin-bottom: 6px;">
+        <b style="font-size: 14px;">[ ${it.quantity || 1}x ] ${it.name}</b>
         ${it.details ? `<div style="font-size: 11px; padding-left: 8px;">${it.details}</div>` : ''}
       </div>
     `).join('');
@@ -121,7 +120,7 @@ export default function Cozinha() {
           <div class="line"></div>
           <div style="display:flex; justify-content: space-between;"><span>Subtotal:</span> <span>R$ ${Number(order.subtotal).toFixed(2)}</span></div>
           <div style="display:flex; justify-content: space-between;"><span>Taxa Entrega:</span> <span>R$ ${Number(order.delivery_fee).toFixed(2)}</span></div>
-          <div style="display:flex; justify-between;" class="bold big"><span>TOTAL:</span> <span>R$ ${Number(order.total).toFixed(2)}</span></div>
+          <div style="display:flex; justify-content: space-between;" class="bold big"><span>TOTAL:</span> <span>R$ ${Number(order.total).toFixed(2)}</span></div>
           <div class="line"></div>
           <div class="center" style="margin-top: 15px;">*** FIM DA COMANDA ***</div>
           <script>
@@ -177,7 +176,7 @@ export default function Cozinha() {
                 <div className="border-t border-b border-gray-800 py-2 space-y-1.5 text-xs">
                   {order.items.map((it, idx) => (
                     <div key={idx}>
-                      <span className="font-bold">• 1x {it.name}</span>
+                      <span className="font-bold text-sm text-white">• {it.quantity || 1}x {it.name}</span>
                       {it.details && <span className="text-orange-300 text-[10px] block pl-3">{it.details}</span>}
                     </div>
                   ))}
@@ -223,7 +222,7 @@ export default function Cozinha() {
                 <div className="border-t border-b border-gray-800 py-2 space-y-1.5 text-xs">
                   {order.items.map((it, idx) => (
                     <div key={idx}>
-                      <span className="font-bold">• 1x {it.name}</span>
+                      <span className="font-bold text-sm text-white">• {it.quantity || 1}x {it.name}</span>
                       {it.details && <span className="text-orange-300 text-[10px] block pl-3">{it.details}</span>}
                     </div>
                   ))}
