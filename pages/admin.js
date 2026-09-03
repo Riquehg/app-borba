@@ -10,10 +10,15 @@ export default function Admin() {
   const [categories, setCategories] = useState([]);
   const [globalAddons, setGlobalAddons] = useState([]);
   const [neighborhoods, setNeighborhoods] = useState([]);
-  const [tenant, setTenant] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [tenant, setTenant] = useState({
+    name: 'Borba Cordeiros',
+    whatsapp: '5547999999999',
+    logo_url: '',
+    banner_url: '',
+    primary_color: '#FF8C00'
+  });
 
-  // States dos formulários
+  // Forms
   const [newProd, setNewProd] = useState({ name: '', price: '', category_id: '', description: '', image: '', addons_list: '' });
   const [editingProduct, setEditingProduct] = useState(null);
   const [editingAddon, setEditingAddon] = useState(null);
@@ -42,7 +47,6 @@ export default function Admin() {
   };
 
   const fetchData = async () => {
-    setLoading(true);
     const { data: tData } = await supabase.from('tenants').select('*').eq('id', 1).single();
     const { data: cData } = await supabase.from('categories').select('*').eq('tenant_id', 1).order('id', { ascending: true });
     const { data: pData } = await supabase.from('products').select('*').eq('tenant_id', 1).order('id', { ascending: true });
@@ -59,7 +63,27 @@ export default function Admin() {
     if (pData) setProducts(pData);
     if (aData) setGlobalAddons(aData);
     if (nData) setNeighborhoods(nData);
-    setLoading(false);
+  };
+
+  // SALVAR CONFIGURAÇÕES DA LOJA (WHATSAPP, LOGO, BANNER)
+  const handleSaveTenantSettings = async (e) => {
+    e.preventDefault();
+    const cleanWhatsapp = tenant.whatsapp.replace(/\D/g, '');
+
+    const { error } = await supabase.from('tenants').update({
+      name: tenant.name,
+      whatsapp: cleanWhatsapp,
+      logo_url: tenant.logo_url,
+      banner_url: tenant.banner_url,
+      primary_color: tenant.primary_color || '#FF8C00'
+    }).eq('id', 1);
+
+    if (error) {
+      alert("Erro ao salvar configurações: " + error.message);
+    } else {
+      alert("Configurações atualizadas com sucesso!");
+      fetchData();
+    }
   };
 
   // PRODUTOS
@@ -266,6 +290,9 @@ export default function Admin() {
         </button>
         <button onClick={() => setActiveTab('neighborhoods')} className={`flex-1 py-2 px-2 rounded-lg whitespace-nowrap ${activeTab === 'neighborhoods' ? 'bg-orange-500 text-white' : 'text-gray-400'}`}>
           🛵 Bairros
+        </button>
+        <button onClick={() => setActiveTab('settings')} className={`flex-1 py-2 px-2 rounded-lg whitespace-nowrap ${activeTab === 'settings' ? 'bg-orange-500 text-white' : 'text-gray-400'}`}>
+          ⚙️ Config
         </button>
       </div>
 
@@ -499,7 +526,7 @@ export default function Admin() {
         </div>
       )}
 
-      {/* ABA 3: ADICIONAIS GLOBAIS COM BOTOES EDITAR E DELETAR */}
+      {/* ABA 3: ADICIONAIS GLOBAIS */}
       {activeTab === 'addons' && (
         <div className="space-y-6">
           <section className="bg-gray-900 p-4 rounded-xl border border-gray-800 space-y-3">
@@ -543,47 +570,6 @@ export default function Admin() {
         </div>
       )}
 
-      {/* MODAL EDITAR ADICIONAL */}
-      {editingAddon && (
-        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 w-full max-w-sm rounded-2xl p-5 border border-gray-700 space-y-3">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="font-bold text-sm text-orange-400">✏️ Editar Adicional</h3>
-              <button onClick={() => setEditingAddon(null)} className="text-gray-400 font-bold text-sm">✕</button>
-            </div>
-
-            <form onSubmit={handleUpdateAddon} className="space-y-3">
-              <div>
-                <label className="text-[11px] text-gray-400 block mb-1">Nome:</label>
-                <input 
-                  type="text" value={editingAddon.name}
-                  className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
-                  onChange={(e) => setEditingAddon({ ...editingAddon, name: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] text-gray-400 block mb-1">Valor R$:</label>
-                <input 
-                  type="text" value={editingAddon.price}
-                  className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
-                  onChange={(e) => setEditingAddon({ ...editingAddon, price: e.target.value })}
-                />
-              </div>
-
-              <div className="flex space-x-2 pt-2">
-                <button type="button" onClick={() => setEditingAddon(null)} className="w-1/2 bg-gray-800 py-2.5 rounded-lg text-xs font-bold text-gray-300">
-                  Cancelar
-                </button>
-                <button type="submit" className="w-1/2 bg-green-600 py-2.5 rounded-lg text-xs font-bold text-white">
-                  Salvar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* ABA 4: BAIRROS */}
       {activeTab === 'neighborhoods' && (
         <div className="space-y-6">
@@ -620,6 +606,58 @@ export default function Admin() {
           </section>
         </div>
       )}
+
+      {/* ABA 5: CONFIGURAÇÕES DA LOJA (WHATSAPP, LOGO, BANNER, NOME) */}
+      {activeTab === 'settings' && (
+        <div className="space-y-6">
+          <section className="bg-gray-900 p-4 rounded-xl border border-gray-800 space-y-3">
+            <h3 className="font-bold text-sm text-orange-400">⚙️ Configurações do Estabelecimento</h3>
+            <form onSubmit={handleSaveTenantSettings} className="space-y-3">
+              <div>
+                <label className="text-[11px] text-gray-400 block mb-1">Nome do Restaurante:</label>
+                <input 
+                  type="text" value={tenant.name || ''}
+                  className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
+                  onChange={(e) => setTenant({ ...tenant, name: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] text-gray-400 block mb-1">WhatsApp da Loja (DDD + Número):</label>
+                <input 
+                  type="text" placeholder="Ex: 5547999999999" value={tenant.whatsapp || ''}
+                  className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
+                  onChange={(e) => setTenant({ ...tenant, whatsapp: e.target.value })}
+                />
+                <span className="text-[10px] text-gray-500 block mt-0.5">É para este número que os pedidos do cardápio serão enviados.</span>
+              </div>
+
+              <div>
+                <label className="text-[11px] text-gray-400 block mb-1">URL do Logo (Imagem da Marca):</label>
+                <input 
+                  type="text" placeholder="https://..." value={tenant.logo_url || ''}
+                  className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
+                  onChange={(e) => setTenant({ ...tenant, logo_url: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] text-gray-400 block mb-1">URL do Banner Principal (Topo):</label>
+                <input 
+                  type="text" placeholder="https://..." value={tenant.banner_url || ''}
+                  className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
+                  onChange={(e) => setTenant({ ...tenant, banner_url: e.target.value })}
+                />
+              </div>
+
+              <button type="submit" className="w-full bg-green-600 font-bold py-2.5 rounded-lg text-xs mt-2">
+                Salvar Configurações
+              </button>
+            </form>
+          </section>
+        </div>
+      )}
+
     </div>
   );
 }
