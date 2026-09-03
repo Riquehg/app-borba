@@ -3,10 +3,10 @@ import { supabase } from '../lib/supabase';
 
 const defaultTenant = {
   name: "Borba Cordeiros",
-  whatsapp: "5547996302864",
+  whatsapp: "5547999999999",
   primary_color: "#FF8C00",
-  logo_url: "https://storage.googleapis.com/prod-cardapio-web/uploads/company/logo/34208/8587d992WhatsApp_Image_2026-06-05_at_10.32.49.jpeg",
-  banner_url: "https://storage.googleapis.com/prod-cardapio-web/uploads/company/image/34208/54f8b26fWhatsApp_Image_2026-06-05_at_10.27.33.jpeg"
+  logo_url: "https://images.unsplash.com/photo-1550547660-d9450f859349?w=150&auto=format&fit=crop&q=80",
+  banner_url: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80"
 };
 
 export default function Home() {
@@ -107,7 +107,7 @@ export default function Home() {
   const currentDeliveryFee = orderType === 'delivery' ? Number(selectedNeighborhood?.fee || 0) : 0;
   const calculateTotal = () => (calculateSubtotal() + currentDeliveryFee).toFixed(2);
 
-  const sendOrderToWhatsApp = () => {
+  const sendOrderToWhatsApp = async () => {
     if (cart.length === 0) return alert("Seu carrinho está vazio!");
     if (!customer.name.trim()) return alert("Preencha seu Nome Completo!");
 
@@ -116,6 +116,30 @@ export default function Home() {
       if (!customer.streetAndNumber.trim()) return alert("Preencha a Rua e o Número da residência!");
     }
 
+    const subtotal = calculateSubtotal();
+    const total = calculateTotal();
+
+    // 1. Salvar no Banco de Dados (Para a Cozinha)
+    try {
+      await supabase.from('orders').insert([{
+        tenant_id: 1,
+        customer_name: customer.name.trim(),
+        order_type: orderType,
+        neighborhood: orderType === 'delivery' ? selectedNeighborhood?.name : 'Retirada',
+        address: customer.streetAndNumber,
+        reference: customer.reference,
+        payment_method: customer.payment,
+        items: cart,
+        subtotal: subtotal,
+        delivery_fee: currentDeliveryFee,
+        total: parseFloat(total),
+        status: 'recebido'
+      }]);
+    } catch (err) {
+      console.log("Erro ao salvar pedido no painel de cozinha:", err);
+    }
+
+    // 2. Montar Mensagem do WhatsApp
     let itemsSummary = cart.map(item => {
       let line = `• 1x ${item.name} (R$ ${item.finalPrice.toFixed(2)})`;
       if (item.details) line += `\n   └ _${item.details}_`;
@@ -137,9 +161,9 @@ ${addressInfo}
 ${itemsSummary}
 
 ----------------------------------
-*Subtotal:* R$ ${calculateSubtotal().toFixed(2)}
+*Subtotal:* R$ ${subtotal.toFixed(2)}
 *Taxa de Entrega:* ${orderType === 'delivery' ? `R$ ${currentDeliveryFee.toFixed(2)}` : 'R$ 0,00 (Retirada)'}
-*TOTAL DO PEDIDO:* R$ ${calculateTotal()}
+*TOTAL DO PEDIDO:* R$ ${total}
 ----------------------------------`;
 
     window.open(`https://wa.me/${tenant.whatsapp}?text=${encodeURIComponent(message)}`, '_blank');
@@ -251,7 +275,7 @@ ${itemsSummary}
         </div>
       )}
 
-      {/* ÁREA DO CARRINHO E CHECKOUT CORRIGIDA */}
+      {/* CARRINHO */}
       {cart.length > 0 && (
         <div className="m-4 mt-8 bg-gray-900 p-4 rounded-xl border border-gray-700 shadow-xl space-y-4">
           <h3 className="font-bold text-md border-b border-gray-800 pb-2 flex justify-between">
@@ -259,7 +283,6 @@ ${itemsSummary}
             <span className="text-xs text-gray-400">{cart.length} itens</span>
           </h3>
 
-          {/* LISTA DE ITENS NO CARRINHO */}
           <div className="space-y-2">
             {cart.map((c) => (
               <div key={c.cartId} className="flex justify-between text-xs bg-gray-800 p-2.5 rounded-lg">
@@ -273,7 +296,6 @@ ${itemsSummary}
             ))}
           </div>
 
-          {/* CHAVEADOR: ENTREGA OU RETIRADA */}
           <div className="pt-2">
             <label className="text-[11px] text-gray-400 block mb-1.5 font-bold">Como deseja receber seu pedido?</label>
             <div className="grid grid-cols-2 gap-2">
@@ -292,7 +314,6 @@ ${itemsSummary}
             </div>
           </div>
 
-          {/* DADOS DO CLIENTE E ENDEREÇO */}
           <div className="space-y-2 pt-1">
             <input 
               type="text"
@@ -302,7 +323,6 @@ ${itemsSummary}
               onChange={(e) => setCustomer({...customer, name: e.target.value})}
             />
 
-            {/* SE FOR ENTREGA: EXIBE BAIRRO OBRIGATÓRIO E ENDEREÇO */}
             {orderType === 'delivery' && (
               <>
                 {neighborhoods.length > 0 && (
@@ -338,14 +358,12 @@ ${itemsSummary}
               </>
             )}
 
-            {/* SE FOR RETIRADA: AVISO SIMPLES */}
             {orderType === 'pickup' && (
               <div className="bg-orange-500/10 border border-orange-500/30 p-3 rounded-lg text-xs text-orange-300">
                 📍 <b>Retirada no Local:</b> Seu pedido será preparado e você poderá retirar diretamente no balcão do restaurante.
               </div>
             )}
 
-            {/* FORMA DE PAGAMENTO */}
             <div>
               <label className="text-[11px] text-gray-400 block mb-1">Forma de Pagamento:</label>
               <select 
@@ -358,7 +376,6 @@ ${itemsSummary}
             </div>
           </div>
 
-          {/* RESUMO DE VALORES */}
           <div className="bg-gray-800 p-3 rounded-lg space-y-1 text-xs">
             <div className="flex justify-between text-gray-400">
               <span>Subtotal:</span>
