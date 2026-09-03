@@ -1,20 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
 export default function Cozinha() {
   const [orders, setOrders] = useState([]);
   const [tenant, setTenant] = useState(null);
-  const [lastOrderCount, setLastOrderCount] = useState(0);
+  const [autoPrint, setAutoPrint] = useState(false);
+  const printedOrdersRef = useRef(new Set());
 
   useEffect(() => {
     fetchOrders();
 
     const interval = setInterval(() => {
       fetchOrders();
-    }, 5000);
+    }, 4000);
 
     return () => clearInterval(interval);
-  }, [lastOrderCount]);
+  }, []);
 
   const fetchOrders = async () => {
     const { data: tData } = await supabase.from('tenants').select('*').eq('id', 1).single();
@@ -29,10 +30,17 @@ export default function Cozinha() {
       .order('id', { ascending: true });
 
     if (oData) {
-      if (oData.length > lastOrderCount && lastOrderCount !== 0) {
-        playBeepSound();
-      }
-      setLastOrderCount(oData.length);
+      // Verifica se entrou pedido novo que ainda não foi impresso
+      oData.forEach(order => {
+        if (!printedOrdersRef.current.has(order.id) && order.status === 'recebido') {
+          playBeepSound();
+          if (autoPrint) {
+            printOrderReceipt(order);
+          }
+          printedOrdersRef.current.add(order.id);
+        }
+      });
+
       setOrders(oData);
     }
   };
@@ -73,7 +81,7 @@ export default function Cozinha() {
     window.open(`https://wa.me/${targetPhone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
-  // IMPRESSÃO DE COMANDA COM QUANTIDADES DESTACADAS
+  // IMPRESSÃO DE COMANDA TÉRMICA
   const printOrderReceipt = (order) => {
     const dateStr = new Date(order.created_at).toLocaleString('pt-BR');
     
@@ -144,14 +152,27 @@ export default function Cozinha() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white p-4 font-sans pb-12">
-      <header className="flex justify-between items-center border-b border-gray-800 pb-3 mb-6">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-800 pb-3 mb-6 gap-3">
         <div>
           <h1 className="font-bold text-xl text-orange-500">👨‍🍳 Painel da Cozinha (KDS)</h1>
           <p className="text-xs text-gray-400">Gerenciamento de Pedidos em Tempo Real</p>
         </div>
-        <button onClick={fetchOrders} className="bg-gray-800 text-xs px-3 py-2 rounded-lg text-orange-400 font-bold border border-gray-700">
-          🔄 Atualizar ({orders.length})
-        </button>
+
+        <div className="flex items-center space-x-3">
+          <label className="flex items-center space-x-2 bg-gray-900 border border-gray-800 px-3 py-2 rounded-lg text-xs cursor-pointer">
+            <input 
+              type="checkbox" 
+              checked={autoPrint} 
+              onChange={(e) => setAutoPrint(e.target.checked)}
+              className="rounded bg-gray-800 border-gray-700 text-orange-500 focus:ring-0" 
+            />
+            <span className="font-bold text-gray-300">🖨️ Impressão Automática</span>
+          </label>
+
+          <button onClick={fetchOrders} className="bg-gray-800 text-xs px-3 py-2 rounded-lg text-orange-400 font-bold border border-gray-700">
+            🔄 Atualizar ({orders.length})
+          </button>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
