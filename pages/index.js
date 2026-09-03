@@ -18,8 +18,8 @@ export default function Home() {
   const [selectedCategoryId, setSelectedCategoryId] = useState("all");
   const [cart, setCart] = useState([]);
   
-  // Checkout Anti-Fraude
-  const [orderType, setOrderType] = useState('delivery'); // 'delivery' ou 'pickup'
+  // Checkout
+  const [orderType, setOrderType] = useState('delivery');
   const [selectedNeighborhood, setSelectedNeighborhood] = useState(null);
   const [customer, setCustomer] = useState({
     name: '',
@@ -27,6 +27,8 @@ export default function Home() {
     reference: '',
     payment: 'PIX'
   });
+
+  const [loadingOrder, setLoadingOrder] = useState(false);
 
   // Modal State
   const [activeModalProduct, setActiveModalProduct] = useState(null);
@@ -116,30 +118,42 @@ export default function Home() {
       if (!customer.streetAndNumber.trim()) return alert("Preencha a Rua e o Número da residência!");
     }
 
+    setLoadingOrder(true);
+
     const subtotal = calculateSubtotal();
     const total = calculateTotal();
 
-    // 1. Salvar no Banco de Dados (Para a Cozinha)
+    let createdOrderId = null;
+
+    // 1. Gravar Pedido no Supabase
     try {
-      await supabase.from('orders').insert([{
+      const { data, error } = await supabase.from('orders').insert([{
         tenant_id: 1,
         customer_name: customer.name.trim(),
         order_type: orderType,
-        neighborhood: orderType === 'delivery' ? selectedNeighborhood?.name : 'Retirada',
-        address: customer.streetAndNumber,
-        reference: customer.reference,
+        neighborhood: orderType === 'delivery' ? selectedNeighborhood?.name : 'Retirada no Balcão',
+        address: orderType === 'delivery' ? customer.streetAndNumber.trim() : 'Retirada no Balcão',
+        reference: customer.reference.trim(),
         payment_method: customer.payment,
         items: cart,
         subtotal: subtotal,
         delivery_fee: currentDeliveryFee,
         total: parseFloat(total),
         status: 'recebido'
-      }]);
+      }]).select('id').single();
+
+      if (error) {
+        console.error("Erro no Supabase ao salvar pedido:", error);
+      } else if (data) {
+        createdOrderId = data.id;
+      }
     } catch (err) {
-      console.log("Erro ao salvar pedido no painel de cozinha:", err);
+      console.error("Falha ao enviar registro do pedido:", err);
     }
 
-    // 2. Montar Mensagem do WhatsApp
+    setLoadingOrder(false);
+
+    // 2. Formatar e Enviar no WhatsApp
     let itemsSummary = cart.map(item => {
       let line = `• 1x ${item.name} (R$ ${item.finalPrice.toFixed(2)})`;
       if (item.details) line += `\n   └ _${item.details}_`;
@@ -148,10 +162,12 @@ export default function Home() {
     
     let addressInfo = orderType === 'delivery' 
       ? `*Tipo:* ENTREGA 🛵\n*Bairro:* ${selectedNeighborhood?.name}\n*Endereço:* ${customer.streetAndNumber}${customer.reference ? `\n*Ref:* ${customer.reference}` : ''}`
-      : `*Tipo:* RETIRADA NO BALCÃO 🛍️`;
+      : `*Tipo:* RETIRADA NO BALCÃO PE🛍️`;
+
+    const orderTag = createdOrderId ? `PEDIDO #${createdOrderId}` : `NOVO PEDIDO`;
 
     const message = 
-`*NOVO PEDIDO - ${tenant.name.toUpperCase()}* 🍔
+`*${orderTag} - ${tenant.name.toUpperCase()}* 🍔
 ----------------------------------
 *Cliente:* ${customer.name}
 ${addressInfo}
@@ -393,8 +409,11 @@ ${itemsSummary}
             </div>
           </div>
 
-          <button onClick={sendOrderToWhatsApp} className="w-full py-3.5 bg-green-600 font-bold rounded-xl text-xs hover:bg-green-700 transition">
-            Enviar Pedido pelo WhatsApp 🚀
+          <button 
+            disabled={loadingOrder}
+            onClick={sendOrderToWhatsApp} 
+            className="w-full py-3.5 bg-green-600 font-bold rounded-xl text-xs hover:bg-green-700 transition flex items-center justify-center space-x-2">
+            <span>{loadingOrder ? 'Processando...' : 'Enviar Pedido pelo WhatsApp 🚀'}</span>
           </button>
         </div>
       )}
