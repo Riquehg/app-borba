@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 
 const defaultTenant = {
   name: "Borba Cordeiros",
-  whatsapp: "5547996302864",
+  whatsapp: "5547999999999",
   primary_color: "#FF8C00",
   logo_url: "https://images.unsplash.com/photo-1550547660-d9450f859349?w=150&auto=format&fit=crop&q=80",
   banner_url: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80"
@@ -35,6 +35,7 @@ export default function Home() {
   const [activeModalProduct, setActiveModalProduct] = useState(null);
   const [selectedAddons, setSelectedAddons] = useState([]);
   const [itemObservation, setItemObservation] = useState("");
+  const [itemQuantity, setItemQuantity] = useState(1);
 
   useEffect(() => {
     async function loadData() {
@@ -66,6 +67,7 @@ export default function Home() {
     setActiveModalProduct(product);
     setSelectedAddons([]);
     setItemObservation("");
+    setItemQuantity(1);
   };
 
   const parseAddons = (str) => {
@@ -86,7 +88,8 @@ export default function Home() {
 
   const confirmCustomProduct = () => {
     const addonsTotal = selectedAddons.reduce((sum, a) => sum + a.price, 0);
-    const finalPrice = Number(activeModalProduct.price) + addonsTotal;
+    const unitPrice = Number(activeModalProduct.price) + addonsTotal;
+    const finalPrice = unitPrice * itemQuantity;
 
     let detailsArr = [];
     if (selectedAddons.length > 0) detailsArr.push(`Add: ${selectedAddons.map(a => a.name).join(', ')}`);
@@ -95,11 +98,28 @@ export default function Home() {
     setCart([...cart, {
       ...activeModalProduct,
       cartId: Date.now(),
+      quantity: itemQuantity,
+      unitPrice,
       finalPrice,
       details: detailsArr.join(' | ')
     }]);
 
     setActiveModalProduct(null);
+  };
+
+  const updateCartQuantity = (cartId, delta) => {
+    setCart(cart.map(item => {
+      if (item.cartId === cartId) {
+        const newQty = item.quantity + delta;
+        if (newQty <= 0) return null;
+        return {
+          ...item,
+          quantity: newQty,
+          finalPrice: item.unitPrice * newQty
+        };
+      }
+      return item;
+    }).filter(Boolean));
   };
 
   const removeFromCart = (cartId) => {
@@ -159,7 +179,7 @@ export default function Home() {
 
     // 2. Formatar e Enviar no WhatsApp do Restaurante
     let itemsSummary = cart.map(item => {
-      let line = `• 1x ${item.name} (R$ ${item.finalPrice.toFixed(2)})`;
+      let line = `• ${item.quantity}x ${item.name} (R$ ${item.finalPrice.toFixed(2)})`;
       if (item.details) line += `\n   └ _${item.details}_`;
       return line;
     }).join('\n');
@@ -242,7 +262,7 @@ ${itemsSummary}
         ))}
       </div>
 
-      {/* MODAL DE PERSONALIZAÇÃO */}
+      {/* MODAL DE PERSONALIZAÇÃO COM QUANTIDADE */}
       {activeModalProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-end justify-center z-50 p-0">
           <div className="bg-gray-900 w-full max-w-md rounded-t-2xl p-5 border-t border-gray-700 max-h-[85vh] overflow-y-auto">
@@ -275,28 +295,48 @@ ${itemsSummary}
               </div>
             )}
 
-            <div className="mb-6">
+            <div className="mb-4">
               <h4 className="text-xs font-bold uppercase tracking-wider text-orange-400 mb-2">Observações do Lanche:</h4>
               <textarea 
                 placeholder="Ex: Tirar salada, carne bem passada, sem maionese..."
-                rows="3"
+                rows="2"
                 value={itemObservation}
                 onChange={(e) => setItemObservation(e.target.value)}
                 className="w-full bg-gray-800 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-none"
               />
             </div>
 
+            {/* SELETOR DE QUANTIDADE DO MODAL */}
+            <div className="flex items-center justify-between bg-gray-800 p-3 rounded-xl mb-6">
+              <span className="text-xs font-bold text-gray-300">Quantidade:</span>
+              <div className="flex items-center space-x-3">
+                <button 
+                  type="button"
+                  onClick={() => setItemQuantity(Math.max(1, itemQuantity - 1))}
+                  className="bg-gray-700 text-white font-bold w-8 h-8 rounded-lg flex items-center justify-center text-sm">
+                  -
+                </button>
+                <span className="font-bold text-sm w-4 text-center">{itemQuantity}</span>
+                <button 
+                  type="button"
+                  onClick={() => setItemQuantity(itemQuantity + 1)}
+                  className="bg-gray-700 text-white font-bold w-8 h-8 rounded-lg flex items-center justify-center text-sm">
+                  +
+                </button>
+              </div>
+            </div>
+
             <button 
               onClick={confirmCustomProduct}
               style={{ backgroundColor: tenant.primary_color }}
               className="w-full py-3 text-white font-bold rounded-xl text-sm">
-              Adicionar ao Carrinho
+              Adicionar ao Carrinho • R$ {((Number(activeModalProduct.price) + selectedAddons.reduce((sum, a) => sum + a.price, 0)) * itemQuantity).toFixed(2)}
             </button>
           </div>
         </div>
       )}
 
-      {/* CARRINHO */}
+      {/* CARRINHO COM SELETOR DE QUANTIDADE */}
       {cart.length > 0 && (
         <div className="m-4 mt-8 bg-gray-900 p-4 rounded-xl border border-gray-700 shadow-xl space-y-4">
           <h3 className="font-bold text-md border-b border-gray-800 pb-2 flex justify-between">
@@ -306,13 +346,20 @@ ${itemsSummary}
 
           <div className="space-y-2">
             {cart.map((c) => (
-              <div key={c.cartId} className="flex justify-between text-xs bg-gray-800 p-2.5 rounded-lg">
-                <div>
+              <div key={c.cartId} className="flex justify-between items-center text-xs bg-gray-800 p-2.5 rounded-lg">
+                <div className="flex-1 pr-2">
                   <div className="font-bold">{c.name}</div>
                   {c.details && <div className="text-[11px] text-gray-400 mt-0.5">{c.details}</div>}
                   <div className="text-orange-400 font-bold mt-1">R$ {c.finalPrice.toFixed(2)}</div>
                 </div>
-                <button onClick={() => removeFromCart(c.cartId)} className="text-red-400 font-bold p-1">✕</button>
+
+                <div className="flex items-center space-x-2 bg-gray-900 p-1 rounded-lg border border-gray-700">
+                  <button onClick={() => updateCartQuantity(c.cartId, -1)} className="px-2 py-0.5 font-bold text-red-400 text-xs">-</button>
+                  <span className="font-bold text-xs">{c.quantity}</span>
+                  <button onClick={() => updateCartQuantity(c.cartId, 1)} className="px-2 py-0.5 font-bold text-green-400 text-xs">+</button>
+                </div>
+
+                <button onClick={() => removeFromCart(c.cartId)} className="text-red-400 font-bold ml-3 p-1">✕</button>
               </div>
             ))}
           </div>
