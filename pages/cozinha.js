@@ -29,7 +29,7 @@ export default function Cozinha() {
       .from('orders')
       .select('*')
       .eq('tenant_id', 1)
-      .neq('status', 'concluido')
+      .neq('status', 'arquivado')
       .neq('status', 'cancelado')
       .order('id', { ascending: true });
 
@@ -67,13 +67,25 @@ export default function Cozinha() {
     fetchOrders();
   };
 
-  // FINALIZAR PEDIDO COM VERIFICAÇÃO DE PAGAMENTO
+  // RETORNAR PARA ETAPA ANTERIOR
+  const handleRegressOrderStatus = async (order) => {
+    let prevStatus = '';
+    if (order.status === 'producao') prevStatus = 'recebido';
+    else if (order.status === 'saiu_entrega') prevStatus = 'producao';
+    else if (order.status === 'concluido') prevStatus = 'saiu_entrega';
+
+    if (prevStatus) {
+      await supabase.from('orders').update({ status: prevStatus }).eq('id', order.id);
+      fetchOrders();
+    }
+  };
+
+  // MARCAR COMO CONCLUÍDO (VAI PARA A 4ª COLUNA)
   const handleCompleteOrder = async (order) => {
     if (!order.is_paid) {
       const confirmPaid = confirm(`O pedido #${order.id} de ${order.customer_name} ainda consta como PENDENTE.\n\nVocê confirma que o valor de R$ ${Number(order.total).toFixed(2)} foi RECEBIDO?`);
       if (!confirmPaid) return;
 
-      // Marca como pago e finaliza
       await supabase.from('orders').update({ is_paid: true, status: 'concluido' }).eq('id', order.id);
     } else {
       await supabase.from('orders').update({ status: 'concluido' }).eq('id', order.id);
@@ -81,7 +93,13 @@ export default function Cozinha() {
     fetchOrders();
   };
 
-  // ALTERAR STATUS DE PAGAMENTO (DISPONÍVEL EM TODAS AS COLUNAS)
+  // ARQUIVAR DEFINITIVAMENTE (SAI DA TELA)
+  const handleArchiveOrder = async (orderId) => {
+    await supabase.from('orders').update({ status: 'arquivado' }).eq('id', orderId);
+    fetchOrders();
+  };
+
+  // ALTERAR STATUS DE PAGAMENTO
   const togglePaymentStatus = async (orderId, currentPaidStatus) => {
     await supabase.from('orders').update({ is_paid: !currentPaidStatus }).eq('id', orderId);
     fetchOrders();
@@ -203,6 +221,7 @@ export default function Cozinha() {
   const receivedOrders = orders.filter(o => o.status === 'recebido');
   const inProductionOrders = orders.filter(o => o.status === 'producao');
   const deliveryOrders = orders.filter(o => o.status === 'saiu_entrega');
+  const completedOrders = orders.filter(o => o.status === 'concluido');
 
   return (
     <div className="min-h-screen bg-gray-950 text-white p-4 font-sans pb-12">
@@ -229,7 +248,7 @@ export default function Cozinha() {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         
         {/* COLUNA 1: RECEBIDOS */}
         <div className="bg-gray-900/60 p-3 rounded-2xl border border-gray-800 flex flex-col space-y-3">
@@ -269,7 +288,7 @@ export default function Cozinha() {
                   ))}
                 </div>
 
-                <div className="flex space-x-2 pt-1">
+                <div className="flex space-x-1.5 pt-1">
                   <button 
                     onClick={() => printOrderReceipt(order)}
                     className="bg-gray-800 hover:bg-gray-700 text-gray-200 px-2.5 py-2 rounded-lg text-xs font-bold border border-gray-700">
@@ -278,7 +297,7 @@ export default function Cozinha() {
                   <button 
                     onClick={() => setCancelingOrder(order)}
                     className="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-2.5 py-2 rounded-lg text-xs font-bold border border-red-500/30">
-                    ❌ Cancelar
+                    ❌
                   </button>
                   <button 
                     onClick={() => {
@@ -332,7 +351,13 @@ export default function Cozinha() {
                   ))}
                 </div>
 
-                <div className="flex space-x-2 pt-1">
+                <div className="flex space-x-1.5 pt-1">
+                  <button 
+                    onClick={() => handleRegressOrderStatus(order)}
+                    title="Voltar para Recebidos"
+                    className="bg-gray-800 hover:bg-gray-700 text-yellow-400 px-2.5 py-2 rounded-lg text-xs font-bold border border-gray-700">
+                    ↩️
+                  </button>
                   <button 
                     onClick={() => printOrderReceipt(order)}
                     className="bg-gray-800 hover:bg-gray-700 text-gray-200 px-2.5 py-2 rounded-lg text-xs font-bold border border-gray-700">
@@ -349,7 +374,7 @@ export default function Cozinha() {
                       notifyCustomerWhatsApp(order, 'saiu_entrega');
                     }}
                     className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg text-xs">
-                    {order.order_type === 'delivery' ? '🛵 Saiu p/ Entrega' : '🛍️ Pronto p/ Retirar'}
+                    {order.order_type === 'delivery' ? '🛵 Saiu p/ Entrega' : '🛍️ Pronto'}
                   </button>
                 </div>
               </div>
@@ -374,7 +399,6 @@ export default function Cozinha() {
                   <span className="text-[10px] bg-gray-800 px-2 py-0.5 rounded text-gray-300 font-bold">{getTimeAgo(order.created_at)}</span>
                 </div>
 
-                {/* SINALIZADOR INTERATIVO DE PAGAMENTO NA 3ª COLUNA */}
                 <div className="flex justify-between items-center bg-gray-950 p-2 rounded-lg border border-gray-800 text-xs">
                   <div>
                     <span className="text-gray-400 text-[10px] block">Pagamento: {order.payment_method}</span>
@@ -387,16 +411,62 @@ export default function Cozinha() {
                   </button>
                 </div>
 
-                <div className="flex space-x-2 pt-1">
+                <div className="flex space-x-1.5 pt-1">
+                  <button 
+                    onClick={() => handleRegressOrderStatus(order)}
+                    title="Voltar para Em Produção"
+                    className="bg-gray-800 hover:bg-gray-700 text-yellow-400 px-2.5 py-1.5 rounded-lg text-xs font-bold border border-gray-700">
+                    ↩️
+                  </button>
                   <button 
                     onClick={() => printOrderReceipt(order)}
-                    className="bg-gray-800 hover:bg-gray-700 text-gray-200 px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-700">
+                    className="bg-gray-800 hover:bg-gray-700 text-gray-200 px-2.5 py-1.5 rounded-lg text-xs font-bold border border-gray-700">
                     🖨️
                   </button>
                   <button 
                     onClick={() => handleCompleteOrder(order)}
-                    className="flex-1 bg-gray-800 hover:bg-gray-700 text-green-400 font-bold py-1.5 rounded-lg text-xs border border-green-500/30">
-                    ✓ Finalizar e Arquivar
+                    className="flex-1 bg-green-600/20 hover:bg-green-600/30 text-green-400 font-bold py-1.5 rounded-lg text-xs border border-green-500/30">
+                    ✓ Mover p/ Concluídos
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* COLUNA 4: CONCLUÍDOS / ENTREGUES */}
+        <div className="bg-gray-900/60 p-3 rounded-2xl border border-gray-800 flex flex-col space-y-3">
+          <div className="flex justify-between items-center bg-purple-950/40 p-2.5 rounded-xl border border-purple-800/40">
+            <span className="font-bold text-xs text-purple-400 uppercase tracking-wider">🏁 4. Concluídos ({completedOrders.length})</span>
+          </div>
+
+          <div className="space-y-3 overflow-y-auto max-h-[75vh]">
+            {completedOrders.map(order => (
+              <div key={order.id} className="bg-gray-900 p-3.5 rounded-xl border border-gray-800 space-y-2 opacity-75">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-purple-300 font-bold text-sm block">#{order.id} - {order.customer_name}</span>
+                    <span className="text-[11px] text-gray-400">Total: R$ {Number(order.total).toFixed(2)}</span>
+                  </div>
+                  <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded font-bold">🟢 PAGO</span>
+                </div>
+
+                <div className="flex space-x-1.5 pt-1">
+                  <button 
+                    onClick={() => handleRegressOrderStatus(order)}
+                    title="Voltar para A caminho"
+                    className="bg-gray-800 hover:bg-gray-700 text-yellow-400 px-2.5 py-1.5 rounded-lg text-xs font-bold border border-gray-700">
+                    ↩️ Voltar
+                  </button>
+                  <button 
+                    onClick={() => printOrderReceipt(order)}
+                    className="bg-gray-800 hover:bg-gray-700 text-gray-200 px-2.5 py-1.5 rounded-lg text-xs font-bold border border-gray-700">
+                    🖨️
+                  </button>
+                  <button 
+                    onClick={() => handleArchiveOrder(order.id)}
+                    className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-1.5 rounded-lg text-xs border border-gray-700">
+                    📦 Arquivar
                   </button>
                 </div>
               </div>
