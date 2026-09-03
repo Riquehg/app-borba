@@ -10,6 +10,9 @@ export default function Admin() {
   const [categories, setCategories] = useState([]);
   const [globalAddons, setGlobalAddons] = useState([]);
   const [neighborhoods, setNeighborhoods] = useState([]);
+  const [allOrders, setAllOrders] = useState([]);
+  const [reportFilter, setReportFilter] = useState('all'); // 'today', 'week', 'all'
+
   const [tenant, setTenant] = useState({
     name: 'Borba Cordeiros',
     whatsapp: '5547999999999',
@@ -52,6 +55,7 @@ export default function Admin() {
     const { data: pData } = await supabase.from('products').select('*').eq('tenant_id', 1).order('id', { ascending: true });
     const { data: aData } = await supabase.from('global_addons').select('*').eq('tenant_id', 1).order('id', { ascending: true });
     const { data: nData } = await supabase.from('neighborhoods').select('*').eq('tenant_id', 1).order('id', { ascending: true });
+    const { data: oData } = await supabase.from('orders').select('*').eq('tenant_id', 1).order('created_at', { ascending: false });
 
     if (tData) setTenant(tData);
     if (cData) {
@@ -63,9 +67,46 @@ export default function Admin() {
     if (pData) setProducts(pData);
     if (aData) setGlobalAddons(aData);
     if (nData) setNeighborhoods(nData);
+    if (oData) setAllOrders(oData);
   };
 
-  // SALVAR CONFIGURAÇÕES DA LOJA (WHATSAPP, LOGO, BANNER)
+  // CÁLCULO DE RELATÓRIOS
+  const getFilteredOrders = () => {
+    const now = new Date();
+    return allOrders.filter(o => {
+      if (o.status === 'cancelado') return false;
+      const orderDate = new Date(o.created_at);
+
+      if (reportFilter === 'today') {
+        return orderDate.toDateString() === now.toDateString();
+      } else if (reportFilter === 'week') {
+        const diffDays = (now - orderDate) / (1000 * 60 * 60 * 24);
+        return diffDays <= 7;
+      }
+      return true;
+    });
+  };
+
+  const filteredOrders = getFilteredOrders();
+  const totalRevenue = filteredOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+  const totalDeliveryFees = filteredOrders.reduce((sum, o) => sum + Number(o.delivery_fee || 0), 0);
+
+  // Calcular itens mais vendidos
+  const productSalesMap = {};
+  filteredOrders.forEach(o => {
+    if (o.items && Array.isArray(o.items)) {
+      o.items.forEach(it => {
+        const q = it.quantity || 1;
+        productSalesMap[it.name] = (productSalesMap[it.name] || 0) + q;
+      });
+    }
+  });
+
+  const topProducts = Object.entries(productSalesMap)
+    .map(([name, qty]) => ({ name, qty }))
+    .sort((a, b) => b.qty - a.qty);
+
+  // CONFIGURAÇÕES DA LOJA
   const handleSaveTenantSettings = async (e) => {
     e.preventDefault();
     const cleanWhatsapp = tenant.whatsapp.replace(/\D/g, '');
@@ -290,6 +331,9 @@ export default function Admin() {
         </button>
         <button onClick={() => setActiveTab('neighborhoods')} className={`flex-1 py-2 px-2 rounded-lg whitespace-nowrap ${activeTab === 'neighborhoods' ? 'bg-orange-500 text-white' : 'text-gray-400'}`}>
           🛵 Bairros
+        </button>
+        <button onClick={() => setActiveTab('reports')} className={`flex-1 py-2 px-2 rounded-lg whitespace-nowrap ${activeTab === 'reports' ? 'bg-orange-500 text-white' : 'text-gray-400'}`}>
+          📊 Relatórios
         </button>
         <button onClick={() => setActiveTab('settings')} className={`flex-1 py-2 px-2 rounded-lg whitespace-nowrap ${activeTab === 'settings' ? 'bg-orange-500 text-white' : 'text-gray-400'}`}>
           ⚙️ Config
@@ -607,7 +651,64 @@ export default function Admin() {
         </div>
       )}
 
-      {/* ABA 5: CONFIGURAÇÕES DA LOJA (WHATSAPP, LOGO, BANNER, NOME) */}
+      {/* ABA 5: RELATÓRIOS E MÉTRICAS */}
+      {activeTab === 'reports' && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center bg-gray-900 p-2 rounded-xl border border-gray-800 text-xs">
+            <span className="text-gray-400 font-bold pl-2">Período do Relatório:</span>
+            <div className="flex space-x-1">
+              <button 
+                onClick={() => setReportFilter('today')} 
+                className={`px-3 py-1.5 rounded-lg font-bold ${reportFilter === 'today' ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400'}`}>
+                Hoje
+              </button>
+              <button 
+                onClick={() => setReportFilter('week')} 
+                className={`px-3 py-1.5 rounded-lg font-bold ${reportFilter === 'week' ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400'}`}>
+                7 Dias
+              </button>
+              <button 
+                onClick={() => setReportFilter('all')} 
+                className={`px-3 py-1.5 rounded-lg font-bold ${reportFilter === 'all' ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400'}`}>
+                Tudo
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-gray-900 p-4 rounded-xl border border-gray-800">
+              <span className="text-[11px] text-gray-400 block mb-1">Faturamento Total</span>
+              <span className="text-lg font-bold text-green-400">R$ {totalRevenue.toFixed(2)}</span>
+            </div>
+            <div className="bg-gray-900 p-4 rounded-xl border border-gray-800">
+              <span className="text-[11px] text-gray-400 block mb-1">Pedidos Realizados</span>
+              <span className="text-lg font-bold text-orange-400">{filteredOrders.length}</span>
+            </div>
+            <div className="bg-gray-900 p-4 rounded-xl border border-gray-800 col-span-2">
+              <span className="text-[11px] text-gray-400 block mb-1">Total Arrecadado em Entregas</span>
+              <span className="text-md font-bold text-blue-400">R$ {totalDeliveryFees.toFixed(2)}</span>
+            </div>
+          </div>
+
+          <section className="bg-gray-900 p-4 rounded-xl border border-gray-800 space-y-3">
+            <h3 className="font-bold text-xs text-orange-400 uppercase tracking-wider">🏆 Itens Mais Vendidos</h3>
+            {topProducts.length === 0 ? (
+              <p className="text-xs text-gray-500">Nenhuma venda registrada neste período.</p>
+            ) : (
+              <div className="space-y-2">
+                {topProducts.map((p, idx) => (
+                  <div key={idx} className="flex justify-between items-center bg-gray-800 p-2.5 rounded-lg text-xs">
+                    <span className="font-bold text-white">{idx + 1}. {p.name}</span>
+                    <span className="bg-orange-500/20 text-orange-400 px-2.5 py-1 rounded-md font-bold">{p.qty} un.</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
+      {/* ABA 6: CONFIGURAÇÕES DA LOJA */}
       {activeTab === 'settings' && (
         <div className="space-y-6">
           <section className="bg-gray-900 p-4 rounded-xl border border-gray-800 space-y-3">
