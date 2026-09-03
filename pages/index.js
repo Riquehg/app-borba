@@ -262,7 +262,7 @@ ${itemsSummary}
         ))}
       </div>
 
-      {/* MODAL DE PERSONALIZAÇÃO COM QUANTIDADE */}
+      {/* MODAL DE PERSONALIZAÇÃO COM AJUSTE DE MULTIPLICADOR */}
       {activeModalProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-end justify-center z-50 p-0">
           <div className="bg-gray-900 w-full max-w-md rounded-t-2xl p-5 border-t border-gray-700 max-h-[85vh] overflow-y-auto">
@@ -306,37 +306,44 @@ ${itemsSummary}
               />
             </div>
 
-            {/* SELETOR DE QUANTIDADE DO MODAL */}
-            <div className="flex items-center justify-between bg-gray-800 p-3 rounded-xl mb-6">
-              <span className="text-xs font-bold text-gray-300">Quantidade:</span>
-              <div className="flex items-center space-x-3">
-                <button 
-                  type="button"
-                  onClick={() => setItemQuantity(Math.max(1, itemQuantity - 1))}
-                  className="bg-gray-700 text-white font-bold w-8 h-8 rounded-lg flex items-center justify-center text-sm">
-                  -
-                </button>
-                <span className="font-bold text-sm w-4 text-center">{itemQuantity}</span>
-                <button 
-                  type="button"
-                  onClick={() => setItemQuantity(itemQuantity + 1)}
-                  className="bg-gray-700 text-white font-bold w-8 h-8 rounded-lg flex items-center justify-center text-sm">
-                  +
-                </button>
+            {/* AVISO ORIENTATIVO DE QUANTIDADE */}
+            <div className="bg-gray-800/80 p-3 rounded-xl mb-4 border border-gray-700">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-bold text-gray-300">Quantidade deste item:</span>
+                <div className="flex items-center space-x-3">
+                  <button 
+                    type="button"
+                    onClick={() => setItemQuantity(Math.max(1, itemQuantity - 1))}
+                    className="bg-gray-700 text-white font-bold w-8 h-8 rounded-lg flex items-center justify-center text-sm">
+                    -
+                  </button>
+                  <span className="font-bold text-sm w-4 text-center">{itemQuantity}</span>
+                  <button 
+                    type="button"
+                    onClick={() => setItemQuantity(itemQuantity + 1)}
+                    className="bg-gray-700 text-white font-bold w-8 h-8 rounded-lg flex items-center justify-center text-sm">
+                    +
+                  </button>
+                </div>
               </div>
+              {selectedAddons.length > 0 && itemQuantity > 1 && (
+                <p className="text-[10px] text-orange-300 italic">
+                  * Os adicionais selecionados acima serão incluídos nos {itemQuantity} lanches.
+                </p>
+              )}
             </div>
 
             <button 
               onClick={confirmCustomProduct}
               style={{ backgroundColor: tenant.primary_color }}
               className="w-full py-3 text-white font-bold rounded-xl text-sm">
-              Adicionar ao Carrinho • R$ {((Number(activeModalProduct.price) + selectedAddons.reduce((sum, a) => sum + a.price, 0)) * itemQuantity).toFixed(2)}
+              Adicionar {itemQuantity}x ao Carrinho • R$ {((Number(activeModalProduct.price) + selectedAddons.reduce((sum, a) => sum + a.price, 0)) * itemQuantity).toFixed(2)}
             </button>
           </div>
         </div>
       )}
 
-      {/* CARRINHO COM SELETOR DE QUANTIDADE */}
+      {/* CARRINHO */}
       {cart.length > 0 && (
         <div className="m-4 mt-8 bg-gray-900 p-4 rounded-xl border border-gray-700 shadow-xl space-y-4">
           <h3 className="font-bold text-md border-b border-gray-800 pb-2 flex justify-between">
