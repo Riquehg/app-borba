@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 
 const defaultTenant = {
   name: "Borba Cordeiros",
-  whatsapp: "5547999999999",
+  whatsapp: "5547996302864",
   primary_color: "#FF8C00",
   logo_url: "https://images.unsplash.com/photo-1550547660-d9450f859349?w=150&auto=format&fit=crop&q=80",
   banner_url: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80"
