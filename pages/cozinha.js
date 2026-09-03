@@ -7,6 +7,10 @@ export default function Cozinha() {
   const [autoPrint, setAutoPrint] = useState(false);
   const printedOrdersRef = useRef(new Set());
 
+  // Modal Cancelamento
+  const [cancelingOrder, setCancelingOrder] = useState(null);
+  const [cancelPassword, setCancelPassword] = useState('');
+
   useEffect(() => {
     fetchOrders();
 
@@ -30,7 +34,6 @@ export default function Cozinha() {
       .order('id', { ascending: true });
 
     if (oData) {
-      // Verifica se entrou pedido novo que ainda não foi impresso
       oData.forEach(order => {
         if (!printedOrdersRef.current.has(order.id) && order.status === 'recebido') {
           playBeepSound();
@@ -62,6 +65,35 @@ export default function Cozinha() {
   const updateOrderStatus = async (orderId, newStatus) => {
     await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
     fetchOrders();
+  };
+
+  // CONFIRMAÇÃO DE CANCELAMENTO COM SENHA DO ADMIN
+  const handleConfirmCancelOrder = async (e) => {
+    e.preventDefault();
+    if (!cancelingOrder) return;
+
+    // Valida contra a senha fixa ou a cadastrada no tenant
+    const adminPass = tenant?.admin_password || 'borba123';
+    
+    if (cancelPassword !== adminPass && cancelPassword !== 'borba123') {
+      return alert("Senha administrativa incorreta!");
+    }
+
+    // 1. Atualiza status no banco
+    await supabase.from('orders').update({ status: 'cancelado' }).eq('id', cancelingOrder.id);
+
+    // 2. Avisa o cliente no WhatsApp
+    const targetPhone = cancelingOrder.customer_phone || tenant?.whatsapp;
+    const cancelMsg = `Olá *${cancelingOrder.customer_name}*! Informamos que seu pedido *#${cancelingOrder.id}* na Borba Cordeiros foi *CANCELADO*. Se tiver dúvidas, entre em contato conosco por aqui.`;
+
+    if (confirm("Deseja enviar a notificação de cancelamento para o cliente no WhatsApp?")) {
+      window.open(`https://wa.me/${targetPhone}?text=${encodeURIComponent(cancelMsg)}`, '_blank');
+    }
+
+    setCancelingOrder(null);
+    setCancelPassword('');
+    fetchOrders();
+    alert(`Pedido #${cancelingOrder.id} cancelado com sucesso.`);
   };
 
   const notifyCustomerWhatsApp = (order, statusText) => {
@@ -206,8 +238,13 @@ export default function Cozinha() {
                 <div className="flex space-x-2 pt-1">
                   <button 
                     onClick={() => printOrderReceipt(order)}
-                    className="bg-gray-800 hover:bg-gray-700 text-gray-200 px-3 py-2 rounded-lg text-xs font-bold border border-gray-700">
-                    🖨️ Imprimir
+                    className="bg-gray-800 hover:bg-gray-700 text-gray-200 px-2.5 py-2 rounded-lg text-xs font-bold border border-gray-700">
+                    🖨️
+                  </button>
+                  <button 
+                    onClick={() => setCancelingOrder(order)}
+                    className="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-2.5 py-2 rounded-lg text-xs font-bold border border-red-500/30">
+                    ❌ Cancelar
                   </button>
                   <button 
                     onClick={() => {
@@ -252,8 +289,13 @@ export default function Cozinha() {
                 <div className="flex space-x-2 pt-1">
                   <button 
                     onClick={() => printOrderReceipt(order)}
-                    className="bg-gray-800 hover:bg-gray-700 text-gray-200 px-3 py-2 rounded-lg text-xs font-bold border border-gray-700">
+                    className="bg-gray-800 hover:bg-gray-700 text-gray-200 px-2.5 py-2 rounded-lg text-xs font-bold border border-gray-700">
                     🖨️
+                  </button>
+                  <button 
+                    onClick={() => setCancelingOrder(order)}
+                    className="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-2.5 py-2 rounded-lg text-xs font-bold border border-red-500/30">
+                    ❌
                   </button>
                   <button 
                     onClick={() => {
@@ -303,6 +345,47 @@ export default function Cozinha() {
         </div>
 
       </div>
+
+      {/* MODAL DE VALIDAÇÃO DE SENHA PARA CANCELAMENTO */}
+      {cancelingOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 w-full max-w-sm rounded-2xl p-5 border border-red-500/40 space-y-4">
+            <div className="flex justify-between items-center border-b border-gray-800 pb-2">
+              <h3 className="font-bold text-sm text-red-400">🚨 Cancelar Pedido #{cancelingOrder.id}</h3>
+              <button onClick={() => setCancelingOrder(null)} className="text-gray-400 font-bold text-sm">✕</button>
+            </div>
+
+            <p className="text-xs text-gray-300">
+              Digite a <b>Senha de Administrador</b> para confirmar o cancelamento do pedido de <b>{cancelingOrder.customer_name}</b>:
+            </p>
+
+            <form onSubmit={handleConfirmCancelOrder} className="space-y-3">
+              <input 
+                type="password"
+                placeholder="Senha de Admin..."
+                value={cancelPassword}
+                onChange={(e) => setCancelPassword(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-xs text-white focus:outline-none"
+                autoFocus
+              />
+
+              <div className="flex space-x-2 pt-1">
+                <button 
+                  type="button" 
+                  onClick={() => setCancelingOrder(null)}
+                  className="w-1/2 bg-gray-800 py-2.5 rounded-lg text-xs font-bold text-gray-300">
+                  Voltar
+                </button>
+                <button 
+                  type="submit" 
+                  className="w-1/2 bg-red-600 hover:bg-red-700 py-2.5 rounded-lg text-xs font-bold text-white">
+                  Confirmar Cancelamento
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
