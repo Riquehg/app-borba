@@ -67,13 +67,27 @@ export default function Cozinha() {
     fetchOrders();
   };
 
-  // TGGLE DE STATUS DE PAGAMENTO (PAGO / PENDENTE)
+  // FINALIZAR PEDIDO COM VERIFICAÇÃO DE PAGAMENTO
+  const handleCompleteOrder = async (order) => {
+    if (!order.is_paid) {
+      const confirmPaid = confirm(`O pedido #${order.id} de ${order.customer_name} ainda consta como PENDENTE.\n\nVocê confirma que o valor de R$ ${Number(order.total).toFixed(2)} foi RECEBIDO?`);
+      if (!confirmPaid) return;
+
+      // Marca como pago e finaliza
+      await supabase.from('orders').update({ is_paid: true, status: 'concluido' }).eq('id', order.id);
+    } else {
+      await supabase.from('orders').update({ status: 'concluido' }).eq('id', order.id);
+    }
+    fetchOrders();
+  };
+
+  // ALTERAR STATUS DE PAGAMENTO (DISPONÍVEL EM TODAS AS COLUNAS)
   const togglePaymentStatus = async (orderId, currentPaidStatus) => {
     await supabase.from('orders').update({ is_paid: !currentPaidStatus }).eq('id', orderId);
     fetchOrders();
   };
 
-  // CONFIRMAÇÃO DE CANCELAMENTO COM SENHA DO ADMIN
+  // CANCELAMENTO COM SENHA
   const handleConfirmCancelOrder = async (e) => {
     e.preventDefault();
     if (!cancelingOrder) return;
@@ -116,7 +130,7 @@ export default function Cozinha() {
     window.open(`https://wa.me/${targetPhone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
-  // IMPRESSÃO DE COMANDA TÉRMICA COM ALERTA DE COBRANÇA
+  // IMPRESSÃO DE COMANDA TÉRMICA
   const printOrderReceipt = (order) => {
     const dateStr = new Date(order.created_at).toLocaleString('pt-BR');
     
@@ -234,7 +248,6 @@ export default function Cozinha() {
                   <span className="text-[10px] bg-gray-800 px-2 py-0.5 rounded text-gray-300 font-bold">{getTimeAgo(order.created_at)}</span>
                 </div>
 
-                {/* SINALIZADOR DE PAGAMENTO */}
                 <div className="flex justify-between items-center bg-gray-950 p-2 rounded-lg border border-gray-800 text-xs">
                   <div>
                     <span className="text-gray-400 text-[10px] block">Pagamento: {order.payment_method}</span>
@@ -298,7 +311,6 @@ export default function Cozinha() {
                   <span className="text-[10px] bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded font-bold">{getTimeAgo(order.created_at)}</span>
                 </div>
 
-                {/* SINALIZADOR DE PAGAMENTO */}
                 <div className="flex justify-between items-center bg-gray-950 p-2 rounded-lg border border-gray-800 text-xs">
                   <div>
                     <span className="text-gray-400 text-[10px] block">Pagamento: {order.payment_method}</span>
@@ -353,15 +365,26 @@ export default function Cozinha() {
 
           <div className="space-y-3 overflow-y-auto max-h-[75vh]">
             {deliveryOrders.map(order => (
-              <div key={order.id} className="bg-gray-900 p-3 rounded-xl border border-gray-800 space-y-2 opacity-85">
+              <div key={order.id} className="bg-gray-900 p-3.5 rounded-xl border border-gray-800 space-y-2.5 opacity-90">
                 <div className="flex justify-between items-start">
                   <div>
                     <span className="text-green-400 font-bold text-sm block">#{order.id} - {order.customer_name}</span>
-                    <span className="text-[11px] text-gray-400">{order.order_type === 'delivery' ? 'A caminho da entrega' : 'Aguardando retirada'}</span>
+                    <span className="text-[11px] text-gray-400">{order.order_type === 'delivery' ? 'A caminho' : 'Aguardando retirada'}</span>
                   </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${order.is_paid ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                  <span className="text-[10px] bg-gray-800 px-2 py-0.5 rounded text-gray-300 font-bold">{getTimeAgo(order.created_at)}</span>
+                </div>
+
+                {/* SINALIZADOR INTERATIVO DE PAGAMENTO NA 3ª COLUNA */}
+                <div className="flex justify-between items-center bg-gray-950 p-2 rounded-lg border border-gray-800 text-xs">
+                  <div>
+                    <span className="text-gray-400 text-[10px] block">Pagamento: {order.payment_method}</span>
+                    <span className="font-bold text-white">R$ {Number(order.total).toFixed(2)}</span>
+                  </div>
+                  <button 
+                    onClick={() => togglePaymentStatus(order.id, order.is_paid)}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border ${order.is_paid ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}`}>
                     {order.is_paid ? '🟢 PAGO' : '🔴 PENDENTE'}
-                  </span>
+                  </button>
                 </div>
 
                 <div className="flex space-x-2 pt-1">
@@ -371,8 +394,8 @@ export default function Cozinha() {
                     🖨️
                   </button>
                   <button 
-                    onClick={() => updateOrderStatus(order.id, 'concluido')}
-                    className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-1.5 rounded-lg text-xs border border-gray-700">
+                    onClick={() => handleCompleteOrder(order)}
+                    className="flex-1 bg-gray-800 hover:bg-gray-700 text-green-400 font-bold py-1.5 rounded-lg text-xs border border-green-500/30">
                     ✓ Finalizar e Arquivar
                   </button>
                 </div>
