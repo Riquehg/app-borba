@@ -9,7 +9,6 @@ export default function Cozinha() {
   useEffect(() => {
     fetchOrders();
 
-    // Consulta do banco a cada 5 segundos
     const interval = setInterval(() => {
       fetchOrders();
     }, 5000);
@@ -30,7 +29,6 @@ export default function Cozinha() {
       .order('id', { ascending: true });
 
     if (oData) {
-      // Toca um beep sonoro caso entre um novo pedido na tela
       if (oData.length > lastOrderCount && lastOrderCount !== 0) {
         playBeepSound();
       }
@@ -49,7 +47,7 @@ export default function Cozinha() {
       osc.start();
       osc.stop(ctx.currentTime + 0.3);
     } catch (e) {
-      console.log("Aviso de áudio bloqueado pelo navegador");
+      console.log("Áudio bloqueado pelo navegador");
     }
   };
 
@@ -58,7 +56,10 @@ export default function Cozinha() {
     fetchOrders();
   };
 
+  // NOTIFICAR CLIENTE NO NÚMERO DELE
   const notifyCustomerWhatsApp = (order, statusText) => {
+    const targetPhone = order.customer_phone || tenant?.whatsapp;
+    
     let message = "";
     if (statusText === 'producao') {
       message = `Olá *${order.customer_name}*! 👋\nSeu pedido *#${order.id}* na Borba Cordeiros foi *CONFIRMADO* e já está em produção na nossa cozinha! 🍔🔥`;
@@ -70,10 +71,10 @@ export default function Cozinha() {
       }
     }
 
-    window.open(`https://wa.me/${tenant?.whatsapp}?text=${encodeURIComponent(message)}`, '_blank');
+    window.open(`https://wa.me/${targetPhone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
-  // FUNÇÃO DE IMPRESSÃO DE COMANDA TÉRMICA
+  // IMPRESSÃO DE COMANDA
   const printOrderReceipt = (order) => {
     const dateStr = new Date(order.created_at).toLocaleString('pt-BR');
     
@@ -104,6 +105,7 @@ export default function Cozinha() {
           <div class="line"></div>
           
           <div><b>Cliente:</b> ${order.customer_name}</div>
+          <div><b>Telefone:</b> ${order.customer_phone || 'Não informado'}</div>
           <div><b>Tipo:</b> ${order.order_type === 'delivery' ? 'ENTREGA 🛵' : 'RETIRADA NO BALCÃO 🛍️'}</div>
           ${order.order_type === 'delivery' ? `
             <div><b>Bairro:</b> ${order.neighborhood}</div>
@@ -117,8 +119,8 @@ export default function Cozinha() {
           <div style="margin-top: 6px;">${itemsHtml}</div>
           
           <div class="line"></div>
-          <div style="display:flex; justify-between;"><span>Subtotal:</span> <span>R$ ${Number(order.subtotal).toFixed(2)}</span></div>
-          <div style="display:flex; justify-between;"><span>Taxa Entrega:</span> <span>R$ ${Number(order.delivery_fee).toFixed(2)}</span></div>
+          <div style="display:flex; justify-content: space-between;"><span>Subtotal:</span> <span>R$ ${Number(order.subtotal).toFixed(2)}</span></div>
+          <div style="display:flex; justify-content: space-between;"><span>Taxa Entrega:</span> <span>R$ ${Number(order.delivery_fee).toFixed(2)}</span></div>
           <div style="display:flex; justify-between;" class="bold big"><span>TOTAL:</span> <span>R$ ${Number(order.total).toFixed(2)}</span></div>
           <div class="line"></div>
           <div class="center" style="margin-top: 15px;">*** FIM DA COMANDA ***</div>
